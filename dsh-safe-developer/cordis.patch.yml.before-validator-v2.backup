@@ -1,0 +1,15 @@
+- name: validar_plugin_local
+  description: 'Valida um plugin local'
+  parameters:
+    - name: projeto
+      type: string
+      required: true
+      description: 'Caminho absoluto do projeto'
+    - name: perfil
+      type: string
+      required: true
+      description: 'Perfil DSH a usar'
+    - name: pacote
+      type: string
+      required: true
+      description: 'Nome do pacote a validar'

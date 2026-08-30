@@ -1,0 +1,16 @@
+# segredos e identidade — nunca versionar
+.dsh/.credentials.yaml
+.dsh/.anonymous-user-id
+
+# estado de sessão do próprio dsh — efêmero, específico da máquina
+.dsh/sessions/
+.dsh/storages/
+.dsh/attachments/
+
+# dependências instaladas (reinstaláveis via pnpm)
+node_modules/
+.dsh/profiles/*/node_modules/
+
+# artefatos de teste locais
+screenshot.png
+screenshot-tool.png

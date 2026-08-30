@@ -1,0 +1,16 @@
+{
+  "name": "dsh-profile-web",
+  "private": true,
+  "dsh": {
+    "profile": {
+      "bundles": [
+        "@deepseek-ai/dsh-base",
+        "@deepseek-ai/dsh-web-app",
+        "dsh-screen-analyzer"
+      ]
+    }
+  },
+  "dependencies": {
+    "dsh-screen-analyzer": "file:E:/DSHARNESS/screen-tool"
+  }
+}

@@ -1,0 +1,179 @@
+import { execFile } from 'node:child_process'
+import { readFile, rm, stat } from 'node:fs/promises'
+import { promisify } from 'node:util'
+
+const execFileAsync = promisify(execFile)
+
+const SCREENSHOT_PATH = 'E:\\DSHARNESS\\screenshot-tool.png'
+const MIN_SCREENSHOT_BYTES = 10_000
+const VISION_MODEL = 'qwen3-vision:4b'
+const OLLAMA_URL = 'http://127.0.0.1:11434/api/generate'
+
+export const name = 'screen-analyzer'
+export const inject = ['tools']
+
+async function validateScreenshot() {
+  let info
+
+  try {
+    info = await stat(SCREENSHOT_PATH)
+  } catch {
+    throw new Error(`A captura não foi criada em ${SCREENSHOT_PATH}.`)
+  }
+
+  if (!info.isFile()) {
+    throw new Error(`O caminho da captura não é um arquivo: ${SCREENSHOT_PATH}`)
+  }
+
+  if (info.size < MIN_SCREENSHOT_BYTES) {
+    throw new Error(
+      `A captura foi rejeitada porque possui apenas ${info.size} bytes. ` +
+        `O mínimo exigido é ${MIN_SCREENSHOT_BYTES} bytes.`,
+    )
+  }
+
+  return info.size
+}
+
+async function capturePrimaryScreen() {
+  await rm(SCREENSHOT_PATH, { force: true })
+
+  const ps = `
+Add-Type -AssemblyName System.Windows.Forms
+Add-Type -AssemblyName System.Drawing
+
+$arquivo = "E:\\DSHARNESS\\screenshot-tool.png"
+
+$bounds = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+$bitmap = New-Object System.Drawing.Bitmap(
+    $bounds.Width,
+    $bounds.Height,
+    [System.Drawing.Imaging.PixelFormat]::Format24bppRgb
+)
+$graphics = [System.Drawing.Graphics]::FromImage($bitmap)
+
+try {
+    $graphics.CopyFromScreen(
+        $bounds.X,
+        $bounds.Y,
+        0,
+        0,
+        $bounds.Size,
+        [System.Drawing.CopyPixelOperation]::SourceCopy
+    )
+    $bitmap.Save($arquivo, [System.Drawing.Imaging.ImageFormat]::Png)
+}
+finally {
+    $graphics.Dispose()
+    $bitmap.Dispose()
+}
+
+if (-not (Test-Path -LiteralPath $arquivo)) {
+    throw "A captura não foi criada."
+}
+`
+
+  await execFileAsync(
+    'powershell.exe',
+    ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', ps],
+    {
+      windowsHide: true,
+      timeout: 20_000,
+      maxBuffer: 1024 * 1024,
+    },
+  )
+
+  return validateScreenshot()
+}
+
+function buildVisionPrompt(question) {
+  return [
+    'Analise exclusivamente a imagem fornecida.',
+    'Liste fatos visíveis, textos legíveis, janelas, botões, campos e posições aproximadas.',
+    'Diferencie claramente observações visuais de inferências.',
+    'Não invente elementos que não estejam visíveis.',
+    'Responda sempre em português do Brasil.',
+    '',
+    `Solicitação do agente: ${question}`,
+  ].join('\n')
+}
+
+async function askVision(question) {
+  const bytes = await readFile(SCREENSHOT_PATH)
+  const imageBase64 = bytes.toString('base64')
+
+  const response = await fetch(OLLAMA_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: VISION_MODEL,
+      prompt: buildVisionPrompt(question),
+      images: [imageBase64],
+      stream: false,
+      keep_alive: -1,
+      think: false,
+      options: {
+        num_ctx: 4096,
+        num_predict: 1024,
+        temperature: 0,
+      },
+    }),
+  })
+
+  if (!response.ok) {
+    const detail = await response.text()
+    throw new Error(`Ollama respondeu HTTP ${response.status}: ${detail}`)
+  }
+
+  const data = await response.json()
+  const answer = String(data.response ?? '').trim()
+
+  if (!answer) {
+    throw new Error('O modelo visual retornou uma resposta vazia.')
+  }
+
+  return answer
+}
+
+export function apply(ctx) {
+  ctx.tools.register({
+    name: 'analisar_tela',
+    description:
+      'Captura a tela principal atual do Windows e solicita uma análise ao modelo visual local qwen3-vision:4b. A ferramenta apenas observa: não move o mouse, não clica e não digita.',
+    parameters: {
+      type: 'object',
+      properties: {
+        pergunta: {
+          type: 'string',
+          description:
+            'O que deve ser identificado na tela. Exemplo: "Quais janelas estão abertas e onde está o botão Salvar?"',
+        },
+      },
+      additionalProperties: false,
+    },
+    output: {
+      schema: { type: 'string' },
+      render: (_args, value) => [{ type: 'text', text: value }],
+    },
+    timeoutMs: 120_000,
+    async execute(args) {
+      const question =
+        typeof args?.pergunta === 'string' && args.pergunta.trim()
+          ? args.pergunta.trim()
+          : 'Descreva objetivamente o que aparece na tela. Identifique janelas, textos legíveis, botões, campos e a posição aproximada dos principais elementos.'
+
+      const screenshotBytes = await capturePrimaryScreen()
+      const analysis = await askVision(question)
+
+      return [
+        `Captura: ${SCREENSHOT_PATH}`,
+        `Tamanho da captura: ${screenshotBytes} bytes`,
+        `Modelo visual: ${VISION_MODEL}`,
+        '',
+        '=== EVIDÊNCIA VISUAL BRUTA ===',
+        analysis,
+        '=== FIM DA EVIDÊNCIA VISUAL ===',
+      ].join('\n')
+    },
+  })
+}

@@ -1,0 +1,324 @@
+import { execFile } from 'node:child_process'
+import { readFile, rm, stat } from 'node:fs/promises'
+import { promisify } from 'node:util'
+
+const execFileAsync = promisify(execFile)
+
+const SCREENSHOT_PATH = 'E:\\DSHARNESS\\screenshot-tool.png'
+const MIN_SCREENSHOT_BYTES = 10_000
+const VISION_MODEL = 'qwen3-vision:4b'
+const OLLAMA_URL = 'http://127.0.0.1:11434/api/generate'
+
+const VISION_SCHEMA = {
+  type: 'object',
+  properties: {
+    resumo: {
+      type: 'string',
+      description: 'Resumo objetivo da tela em até 300 caracteres.',
+      maxLength: 300,
+    },
+    janelas: {
+      type: 'array',
+      maxItems: 3,
+      items: {
+        type: 'object',
+        properties: {
+          nome: {
+            type: 'string',
+            description: 'Nome ou título curto da janela.',
+            maxLength: 80,
+          },
+          posicao: {
+            type: 'string',
+            description: 'Posição aproximada na tela.',
+            maxLength: 60,
+          },
+          conteudo_resumido: {
+            type: 'string',
+            description: 'Conteúdo principal em até 180 caracteres.',
+            maxLength: 180,
+          },
+          elementos_visiveis: {
+            type: 'array',
+            maxItems: 4,
+            items: { type: 'string', maxLength: 100 },
+          },
+        },
+        required: [
+          'nome',
+          'posicao',
+          'conteudo_resumido',
+          'elementos_visiveis',
+        ],
+        additionalProperties: false,
+      },
+    },
+    textos_relevantes: {
+      type: 'array',
+      maxItems: 6,
+      items: { type: 'string', maxLength: 100 },
+    },
+    observacoes: {
+      type: 'array',
+      maxItems: 4,
+      items: { type: 'string', maxLength: 100 },
+    },
+  },
+  required: [
+    'resumo',
+    'janelas',
+    'textos_relevantes',
+    'observacoes',
+  ],
+  additionalProperties: false,
+}
+
+export const name = 'screen-analyzer'
+export const inject = ['tools']
+
+function limitText(value, maxLength) {
+  return String(value ?? '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, maxLength)
+}
+
+function limitList(value, maxItems, maxLength) {
+  if (!Array.isArray(value)) {
+    return []
+  }
+
+  return value
+    .slice(0, maxItems)
+    .map((item) => limitText(item, maxLength))
+    .filter(Boolean)
+}
+
+function normalizeVisionResult(value) {
+  const windows = Array.isArray(value?.janelas)
+    ? value.janelas.slice(0, 3).map((window) => ({
+        nome: limitText(window?.nome, 80),
+        posicao: limitText(window?.posicao, 60),
+        conteudo_resumido: limitText(
+          window?.conteudo_resumido,
+          180,
+        ),
+        elementos_visiveis: limitList(
+          window?.elementos_visiveis,
+          4,
+          100,
+        ),
+      }))
+    : []
+
+  return {
+    resumo: limitText(value?.resumo, 300),
+    janelas: windows,
+    textos_relevantes: limitList(
+      value?.textos_relevantes,
+      6,
+      100,
+    ),
+    observacoes: limitList(value?.observacoes, 4, 100),
+  }
+}
+
+async function validateScreenshot() {
+  let info
+
+  try {
+    info = await stat(SCREENSHOT_PATH)
+  } catch {
+    throw new Error(`A captura não foi criada em ${SCREENSHOT_PATH}.`)
+  }
+
+  if (!info.isFile()) {
+    throw new Error(
+      `O caminho da captura não é um arquivo: ${SCREENSHOT_PATH}`,
+    )
+  }
+
+  if (info.size < MIN_SCREENSHOT_BYTES) {
+    throw new Error(
+      `A captura foi rejeitada porque possui apenas ${info.size} bytes. ` +
+        `O mínimo exigido é ${MIN_SCREENSHOT_BYTES} bytes.`,
+    )
+  }
+
+  return info.size
+}
+
+async function capturePrimaryScreen() {
+  await rm(SCREENSHOT_PATH, { force: true })
+
+  const ps = `
+Add-Type -AssemblyName System.Windows.Forms
+Add-Type -AssemblyName System.Drawing
+
+$arquivo = "E:\\DSHARNESS\\screenshot-tool.png"
+
+$bounds = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+$bitmap = New-Object System.Drawing.Bitmap(
+    $bounds.Width,
+    $bounds.Height,
+    [System.Drawing.Imaging.PixelFormat]::Format24bppRgb
+)
+$graphics = [System.Drawing.Graphics]::FromImage($bitmap)
+
+try {
+    $graphics.CopyFromScreen(
+        $bounds.X,
+        $bounds.Y,
+        0,
+        0,
+        $bounds.Size,
+        [System.Drawing.CopyPixelOperation]::SourceCopy
+    )
+    $bitmap.Save($arquivo, [System.Drawing.Imaging.ImageFormat]::Png)
+}
+finally {
+    $graphics.Dispose()
+    $bitmap.Dispose()
+}
+
+if (-not (Test-Path -LiteralPath $arquivo)) {
+    throw "A captura não foi criada."
+}
+`
+
+  await execFileAsync(
+    'powershell.exe',
+    [
+      '-NoProfile',
+      '-NonInteractive',
+      '-ExecutionPolicy',
+      'Bypass',
+      '-Command',
+      ps,
+    ],
+    {
+      windowsHide: true,
+      timeout: 20_000,
+      maxBuffer: 1024 * 1024,
+    },
+  )
+
+  return validateScreenshot()
+}
+
+function buildVisionPrompt(question) {
+  return [
+    'Analise exclusivamente a imagem fornecida.',
+    'Responda somente com JSON válido compatível com o esquema fornecido.',
+    'Não use Markdown e não inclua explicações fora do JSON.',
+    'Não transcreva listas extensas nem repita informações.',
+    'Diferencie fatos visíveis de inferências.',
+    'Responda em português do Brasil.',
+    `Solicitação: ${question}`,
+    `Esquema JSON: ${JSON.stringify(VISION_SCHEMA)}`,
+  ].join('\n')
+}
+
+async function askVision(question) {
+  const bytes = await readFile(SCREENSHOT_PATH)
+  const imageBase64 = bytes.toString('base64')
+
+  const response = await fetch(OLLAMA_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: VISION_MODEL,
+      prompt: buildVisionPrompt(question),
+      images: [imageBase64],
+      format: VISION_SCHEMA,
+      stream: false,
+      keep_alive: -1,
+      think: false,
+      options: {
+        num_ctx: 4096,
+        num_predict: 1024,
+        temperature: 0,
+        repeat_last_n: 256,
+        repeat_penalty: 1.2,
+      },
+    }),
+  })
+
+  if (!response.ok) {
+    const detail = await response.text()
+    throw new Error(
+      `Ollama respondeu HTTP ${response.status}: ${detail}`,
+    )
+  }
+
+  const data = await response.json()
+  const answer = String(data.response ?? '').trim()
+
+  if (!answer) {
+    throw new Error('O modelo visual retornou uma resposta vazia.')
+  }
+
+  if (data.done_reason === 'length') {
+    throw new Error(
+      'O modelo visual atingiu o limite antes de concluir o JSON.',
+    )
+  }
+
+  let parsed
+
+  try {
+    parsed = JSON.parse(answer)
+  } catch {
+    throw new Error(
+      'O modelo visual retornou um JSON inválido.',
+    )
+  }
+
+  return JSON.stringify(normalizeVisionResult(parsed), null, 2)
+}
+
+export function apply(ctx) {
+  ctx.tools.register({
+    name: 'analisar_tela',
+    description:
+      'Captura a tela principal do Windows e solicita uma análise estruturada ao modelo local qwen3-vision:4b. Apenas observa: não move o mouse, não clica e não digita.',
+    parameters: {
+      type: 'object',
+      properties: {
+        pergunta: {
+          type: 'string',
+          description:
+            'O que deve ser identificado na tela.',
+        },
+      },
+      additionalProperties: false,
+    },
+    output: {
+      schema: { type: 'string' },
+      render: (_args, value) => [
+        { type: 'text', text: value },
+      ],
+    },
+    timeoutMs: 120_000,
+    async execute(args) {
+      const question =
+        typeof args?.pergunta === 'string' &&
+        args.pergunta.trim()
+          ? args.pergunta.trim()
+          : 'Descreva objetivamente as janelas e os principais elementos visíveis.'
+
+      const screenshotBytes = await capturePrimaryScreen()
+      const analysis = await askVision(question)
+
+      return [
+        `Captura: ${SCREENSHOT_PATH}`,
+        `Tamanho da captura: ${screenshotBytes} bytes`,
+        `Modelo visual: ${VISION_MODEL}`,
+        '',
+        '=== EVIDÊNCIA VISUAL BRUTA ===',
+        analysis,
+        '=== FIM DA EVIDÊNCIA VISUAL ===',
+      ].join('\n')
+    },
+  })
+}

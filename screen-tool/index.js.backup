@@ -1,0 +1,131 @@
+import { execFile } from 'node:child_process'
+import { readFile } from 'node:fs/promises'
+import { promisify } from 'node:util'
+
+const execFileAsync = promisify(execFile)
+
+const SCREENSHOT_PATH = 'E:\\DSHARNESS\\screenshot-tool.png'
+const VISION_MODEL = 'qwen3-vision:4b'
+const OLLAMA_URL = 'http://127.0.0.1:11434/api/generate'
+
+export const name = 'screen-analyzer'
+export const inject = ['tools']
+
+async function capturePrimaryScreen() {
+  const ps = `
+Add-Type -AssemblyName System.Windows.Forms
+Add-Type -AssemblyName System.Drawing
+
+$arquivo = "E:\\DSHARNESS\\screenshot-tool.png"
+
+$bounds = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+$bitmap = New-Object System.Drawing.Bitmap(
+    $bounds.Width,
+    $bounds.Height,
+    [System.Drawing.Imaging.PixelFormat]::Format24bppRgb
+)
+$graphics = [System.Drawing.Graphics]::FromImage($bitmap)
+
+try {
+    $graphics.CopyFromScreen(
+        $bounds.X,
+        $bounds.Y,
+        0,
+        0,
+        $bounds.Size,
+        [System.Drawing.CopyPixelOperation]::SourceCopy
+    )
+    $bitmap.Save($arquivo, [System.Drawing.Imaging.ImageFormat]::Png)
+}
+finally {
+    $graphics.Dispose()
+    $bitmap.Dispose()
+}
+
+if (-not (Test-Path $arquivo)) {
+    throw "A captura não foi criada."
+}
+`
+
+  await execFileAsync(
+    'powershell.exe',
+    ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', ps],
+    {
+      windowsHide: true,
+      timeout: 20000,
+      maxBuffer: 1024 * 1024,
+    },
+  )
+}
+
+async function askVision(question) {
+  const bytes = await readFile(SCREENSHOT_PATH)
+  const imageBase64 = bytes.toString('base64')
+
+  const response = await fetch(OLLAMA_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: VISION_MODEL,
+      prompt: question,
+      images: [imageBase64],
+      stream: false,
+      keep_alive: -1,
+      think: false,
+      options: {
+        num_ctx: 4096,
+        num_predict: 1024,
+        temperature: 0.1,
+      },
+    }),
+  })
+
+  if (!response.ok) {
+    const detail = await response.text()
+    throw new Error(`Ollama respondeu HTTP ${response.status}: ${detail}`)
+  }
+
+  const data = await response.json()
+  const answer = String(data.response ?? '').trim()
+
+  if (!answer) {
+    throw new Error('O modelo visual retornou uma resposta vazia.')
+  }
+
+  return answer
+}
+
+export function apply(ctx) {
+  ctx.tools.register({
+    name: 'analisar_tela',
+    description:
+      'Captura a tela principal atual do Windows e pede ao modelo visual local qwen3-vision:4b para analisá-la. Use quando precisar saber o que está visível na tela. Esta ferramenta apenas observa: não move o mouse, não clica e não digita.',
+    parameters: {
+      type: 'object',
+      properties: {
+        pergunta: {
+          type: 'string',
+          description:
+            'O que deve ser identificado na tela. Ex.: "Quais janelas estão abertas e onde está o botão Salvar?"',
+        },
+      },
+      additionalProperties: false,
+    },
+    output: {
+      schema: { type: 'string' },
+      render: (_args, value) => [{ type: 'text', text: value }],
+    },
+    timeoutMs: 120000,
+    async execute(args) {
+      const question =
+        typeof args?.pergunta === 'string' && args.pergunta.trim()
+          ? args.pergunta.trim()
+          : 'Descreva objetivamente o que aparece na tela. Identifique janelas, textos legíveis, botões, campos e a posição aproximada dos principais elementos.'
+
+      await capturePrimaryScreen()
+      const analysis = await askVision(question)
+
+      return `Captura: ${SCREENSHOT_PATH}\nModelo visual: ${VISION_MODEL}\n\n${analysis}`
+    },
+  })
+}
