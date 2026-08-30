@@ -268,10 +268,20 @@ function buildAnalisarTelaTool(name) {
   }
 }
 
-export function apply(ctx) {
-  ctx.tools.register(buildAnalisarTelaTool('analisar_tela'))
+// Modelos menores (ex. qwen3-vl:4b-instruct) variam a forma que inventam
+// pro nome da ferramenta em vez de usar "analisar_tela" literalmente.
+// Cobre as variações observadas em vez de perseguir uma de cada vez.
+const TOOL_NAME_ALIASES = [
+  'analisar_tela',
+  'analise_tela',
+  'analises_tela',
+  'analisa_tela',
+  'ver_tela',
+  'capturar_tela',
+]
 
-  // Alias: modelos menores (ex. qwen3-vl:4b-instruct) às vezes chamam
-  // "analise_tela" (substantivo) em vez de "analisar_tela" (verbo).
-  ctx.tools.register(buildAnalisarTelaTool('analise_tela'))
+export function apply(ctx) {
+  for (const name of TOOL_NAME_ALIASES) {
+    ctx.tools.register(buildAnalisarTelaTool(name))
+  }
 }
