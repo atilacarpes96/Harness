@@ -1,5 +1,5 @@
 agent-default-model:
-  model: qwen3-vl:8b-instruct
+  model: qwen3-vl:4b-instruct
   provider: ollama
 llm-pi-ai:
   providers:
