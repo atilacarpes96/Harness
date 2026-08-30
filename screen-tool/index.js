@@ -222,9 +222,9 @@ async function askVision(question) {
   return JSON.stringify(normalizeVisionResult(parsed), null, 2)
 }
 
-export function apply(ctx) {
-  ctx.tools.register({
-    name: 'analisar_tela',
+function buildAnalisarTelaTool(name) {
+  return {
+    name,
     description:
       'Captura a tela principal do Windows e solicita uma análise estruturada ao modelo local qwen3.5:4b. Apenas observa: não move o mouse, não clica e não digita.',
     parameters: {
@@ -265,5 +265,13 @@ export function apply(ctx) {
         '=== FIM DA EVIDÊNCIA VISUAL ===',
       ].join('\n')
     },
-  })
+  }
+}
+
+export function apply(ctx) {
+  ctx.tools.register(buildAnalisarTelaTool('analisar_tela'))
+
+  // Alias: modelos menores (ex. qwen3-vl:4b-instruct) às vezes chamam
+  // "analise_tela" (substantivo) em vez de "analisar_tela" (verbo).
+  ctx.tools.register(buildAnalisarTelaTool('analise_tela'))
 }
