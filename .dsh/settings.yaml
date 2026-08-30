@@ -1,5 +1,5 @@
 agent-default-model:
-  model: qwen3-vl:4b-instruct
+  model: qwen3-vl:8b
   provider: ollama
 llm-pi-ai:
   providers:
@@ -16,6 +16,8 @@ llm-pi-ai:
           reasoningEfforts:
             "off":
             high: high
+          compat:
+            thinkingFormat: qwen
         - contextWindow: 32768
           id: qwen3-vl:4b-instruct
           input:
