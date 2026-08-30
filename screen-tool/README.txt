@@ -2,7 +2,7 @@ DSH Screen Analyzer
 
 Tool: analisar_tela
 Captura: E:\DSHARNESS\screenshot-tool.png
-Modelo visual: qwen3-vision:4b
+Modelo visual: qwen3.5:4b
 
 Instalação:
 1. Extraia a pasta screen-tool para E:\DSHARNESS\screen-tool

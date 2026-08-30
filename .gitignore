@@ -14,3 +14,6 @@ node_modules/
 # artefatos de teste locais
 screenshot.png
 screenshot-tool.png
+
+# estado local do Claude Code
+.claude/

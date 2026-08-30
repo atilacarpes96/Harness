@@ -1,0 +1,16 @@
+lockfileVersion: '9.0'
+
+settings:
+  autoInstallPeers: false
+  excludeLinksFromLockfile: false
+
+importers:
+
+  .:
+    dependencies:
+      dsh-safe-developer:
+        specifier: link:E:/DSHARNESS/dsh-safe-developer
+        version: link:../../../dsh-safe-developer
+      dsh-screen-analyzer:
+        specifier: link:E:/DSHARNESS/screen-tool
+        version: link:../../../screen-tool

@@ -1,0 +1,18 @@
+{
+  "name": "dsh-profile-headless",
+  "private": true,
+  "dependencies": {
+    "dsh-safe-developer": "link:E:/DSHARNESS/dsh-safe-developer",
+    "dsh-screen-analyzer": "link:E:/DSHARNESS/screen-tool"
+  },
+  "dsh": {
+    "profile": {
+      "bundles": [
+        "@deepseek-ai/dsh-base",
+        "@deepseek-ai/dsh-headless",
+        "dsh-safe-developer",
+        "dsh-screen-analyzer"
+      ]
+    }
+  }
+}

@@ -48,17 +48,6 @@ function limitText(value, maxLength) {
     .slice(0, maxLength)
 }
 
-function limitList(value, maxItems, maxLength) {
-  if (!Array.isArray(value)) {
-    return []
-  }
-
-  return value
-    .slice(0, maxItems)
-    .map((item) => limitText(item, maxLength))
-    .filter(Boolean)
-}
-
 function normalizeVisionResult(value) {
   return {
     resumo: limitText(value?.resumo, 300),
