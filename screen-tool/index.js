@@ -628,6 +628,7 @@ export function montarArgumentos(args) {
   if (Number.isFinite(args?.quantidade)) ps.push('-Quantidade', String(Math.round(args.quantidade)))
   if (args?.botao) ps.push('-Botao', String(args.botao))
   if (args?.duplo === true) ps.push('-Duplo')
+  if (args?.substituir === true) ps.push('-Substituir')
 
   const esperada = typeof args?.janela_esperada === 'string' ? args.janela_esperada.trim() : ''
   if (esperada) ps.push('-JanelaEsperada', esperada)
@@ -732,6 +733,13 @@ function construirFerramentaAcao() {
         },
         botao: { type: 'string', enum: ['left', 'right', 'middle'], description: 'Botão do mouse.' },
         duplo: { type: 'boolean', description: 'Clique duplo.' },
+        substituir: {
+          type: 'boolean',
+          description:
+            'Em digitar: apagar o que já está no campo antes de escrever. ' +
+            'Use sempre que o campo puder ter conteúdo, como barra de endereço — ' +
+            'clicar posiciona o cursor mas não seleciona, e o texto sairia concatenado.',
+        },
         janela_esperada: {
           type: 'string',
           description:

@@ -28,6 +28,8 @@ param(
   [ValidateSet('left','right','middle')][string]$Botao = 'left',
   [switch]$Duplo,
   [string]$Texto = '',
+  # Selecionar tudo antes de digitar, substituindo o conteudo do campo.
+  [switch]$Substituir,
   [string]$Teclas = '',
   [int]$Quantidade = 0,
   [string]$JanelaEsperada = '',
@@ -357,6 +359,18 @@ switch ($Acao) {
 
   'digitar' {
     if (-not $Texto) { Falhar "A acao 'digitar' exige -Texto." }
+    # Substituir o conteudo do campo antes de escrever. Clicar num campo que ja
+    # tem texto posiciona o cursor, mas NAO seleciona: sem isto o texto novo e
+    # concatenado ao antigo. Foi assim que "about:blank" + um endereco viraram
+    # "chrome://blankhttps//..." na barra do Chrome.
+    #
+    # No mesmo processo de proposito: separar em duas chamadas daria uma janela
+    # entre o ctrl+a e a digitacao em que o foco pode mudar e a selecao se perde.
+    if ($Substituir) {
+      [Win32Act]::Combo([uint16[]]@(0x11), [uint16]0x41)  # ctrl+a
+      Start-Sleep -Milliseconds 40
+      $resultado.substituiu = $true
+    }
     # KEYEVENTF_UNICODE manda o caractere direto, sem passar por layout de
     # teclado: acentuacao e cedilha funcionam sem depender do ABNT2.
     [Win32Act]::TypeText($Texto)

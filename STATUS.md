@@ -129,6 +129,25 @@ calculado em JavaScript — **3/3** —, e depois com o modelo local fazendo o c
 sozinho (calcular 6×9 e conferir o próprio resultado), com o valor confirmado
 por leitura independente.
 
+**Primeiro alvo fora do laboratório (31/08): o site do CBMRS pelo Chrome.** A
+ferramenta fez tudo — focar, achar a barra de endereço pela árvore de
+acessibilidade, digitar, Enter, esperar e conferir. Chegou em
+`bombeiros.rs.gov.br/inicial`, com 58 linhas lidas da página.
+
+Mas falhou na primeira tentativa, e o modo de falha valeu mais que o sucesso: o
+título ficou `chrome://blankhttps//www.bombeiros.rs.gov.br/`. Clicar num campo
+**posiciona o cursor mas não seleciona**, então o endereço foi concatenado ao
+`about:blank` que já estava lá, e o Chrome tentou interpretar o resultado — foi
+daí que sumiu o `:` do `https://`, e não de erro na digitação (verificado à
+parte: `a:b/c:d` chega intacto).
+
+Correção: `digitar` ganhou `substituir: true`, que seleciona tudo antes de
+escrever, no **mesmo processo** — separar em duas chamadas deixaria uma janela
+entre o `ctrl+a` e a digitação em que o foco pode mudar e a seleção se perde.
+
+Lição para os próximos alvos reais: a Calculadora é dócil demais. Aplicativo de
+verdade tem campo com conteúdo, janela que demora e controle sem nome.
+
 ## Inicializador
 
 `iniciar.ps1` + ícone na Área de Trabalho (`instalar-atalho.ps1`, roda uma vez).

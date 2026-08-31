@@ -370,6 +370,16 @@ test('acharTexto exige igualdade em busca de 1 ou 2 caracteres', () => {
   assert.equal(acharTexto(dados, 'Salvar').length, 1, 'busca longa continua por trecho')
 })
 
+test('substituir vira -Substituir na linha de comando', () => {
+  // Clicar num campo posiciona o cursor mas NAO seleciona. Sem isto o texto
+  // novo e concatenado ao antigo: foi assim que "about:blank" mais um endereco
+  // viraram "chrome://blankhttps//..." na barra do Chrome.
+  const r = montarArgumentos({ acao: 'digitar', texto: 'x', janela_esperada: 'Chrome', substituir: true })
+  assert.ok(r.ps.includes('-Substituir'))
+  const sem = montarArgumentos({ acao: 'digitar', texto: 'x', janela_esperada: 'Chrome' })
+  assert.ok(!sem.ps.includes('-Substituir'), 'sem pedir, nao apaga o campo de ninguem')
+})
+
 test('focar não é forçado a simular, mas leva a janela alvo', () => {
   const r = montarArgumentos({ acao: 'focar', janela_esperada: 'Bloco' })
   assert.equal(r.semConfirmacao, false, 'focar não muda conteúdo, só traz para frente')
