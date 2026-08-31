@@ -405,14 +405,40 @@ async function lerElementos(janela) {
 
 // Casa por AutomationId exato primeiro: é o identificador estável, e não muda
 // com o idioma do Windows. Só depois tenta o nome visível.
+// Página web expõe o MESMO alvo várias vezes na árvore — um link costuma
+// aparecer como ListItem e como Hyperlink, no mesmo pixel. Sem juntar, toda
+// busca numa página vira "ambíguo" e a automação trava sem motivo real.
+// Mesma coordenada e mesmo nome = mesma coisa; fica o tipo mais acionável.
+const PRIORIDADE_TIPO = ['Button', 'Hyperlink', 'Edit', 'CheckBox', 'RadioButton', 'ComboBox', 'MenuItem', 'TabItem', 'ListItem', 'Text']
+
+function juntarDuplicados(lista) {
+  const porLugar = new Map()
+  for (const e of lista) {
+    const chave = `${e.x},${e.y},${normalizar(e.nome)}`
+    const atual = porLugar.get(chave)
+    if (!atual) {
+      porLugar.set(chave, e)
+      continue
+    }
+    const posAtual = PRIORIDADE_TIPO.indexOf(atual.tipo)
+    const posNovo = PRIORIDADE_TIPO.indexOf(e.tipo)
+    const melhorAtual = posAtual === -1 ? 99 : posAtual
+    const melhorNovo = posNovo === -1 ? 99 : posNovo
+    if (melhorNovo < melhorAtual) porLugar.set(chave, e)
+  }
+  return [...porLugar.values()]
+}
+
 export function acharElemento(elementos, procurado) {
   const alvo = normalizar(procurado)
-  const porId = elementos.filter((e) => normalizar(e.id) === alvo)
-  if (porId.length) return porId
+  const porId = elementos.filter((e) => e.id && normalizar(e.id) === alvo)
+  if (porId.length) return juntarDuplicados(porId)
   const nomeExato = elementos.filter((e) => normalizar(e.nome) === alvo)
-  if (nomeExato.length) return nomeExato
-  return elementos.filter(
-    (e) => normalizar(e.nome).includes(alvo) || normalizar(e.id).includes(alvo),
+  if (nomeExato.length) return juntarDuplicados(nomeExato)
+  return juntarDuplicados(
+    elementos.filter(
+      (e) => normalizar(e.nome).includes(alvo) || (e.id && normalizar(e.id).includes(alvo)),
+    ),
   )
 }
 

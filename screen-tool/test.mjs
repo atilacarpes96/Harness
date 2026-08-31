@@ -349,6 +349,27 @@ test('acharElemento acha o botão certo pelo nome, e não o de memória', () => 
   assert.equal(r[0].id, 'plusButton')
 })
 
+test('acharElemento junta o mesmo alvo duplicado pela arvore da web', () => {
+  // Pagina web expoe o mesmo link como ListItem E como Hyperlink, no mesmo
+  // pixel. Sem juntar, toda busca numa pagina vira "ambiguo" e a automacao
+  // trava sem motivo real. Fica o tipo mais acionavel.
+  const duplicado = [
+    { nome: 'Serviços', id: '', tipo: 'ListItem', x: 956, y: 314, habilitado: true },
+    { nome: 'Serviços', id: '', tipo: 'Hyperlink', x: 956, y: 314, habilitado: true },
+  ]
+  const r = acharElemento(duplicado, 'Serviços')
+  assert.equal(r.length, 1, 'mesma coordenada e mesmo nome = mesma coisa')
+  assert.equal(r[0].tipo, 'Hyperlink', 'fica o acionavel, nao o item de lista')
+})
+
+test('acharElemento nao junta alvos de mesmo nome em lugares diferentes', () => {
+  const doisLugares = [
+    { nome: 'Abrir', id: '', tipo: 'Button', x: 100, y: 100, habilitado: true },
+    { nome: 'Abrir', id: '', tipo: 'Button', x: 800, y: 400, habilitado: true },
+  ]
+  assert.equal(acharElemento(doisLugares, 'Abrir').length, 2, 'ambiguidade de verdade tem que sobreviver')
+})
+
 test('acharElemento devolve os empates em vez de escolher', () => {
   // "Limpar" casa exato com um e por prefixo com outro: o exato deve ganhar.
   assert.deepEqual(acharElemento(BOTOES_CALCULADORA, 'Limpar').map((e) => e.id), ['clearButton'])
