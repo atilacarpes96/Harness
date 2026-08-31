@@ -143,6 +143,65 @@ test('formatar respeita o filtro de monitor', () => {
   assert.ok(!texto.includes('"Editor"'), 'janela do outro monitor fica de fora')
 })
 
+// O arranjo real da máquina, conferido em 31/08/2026 com as duas telas ligadas:
+// a secundária está em pé, à esquerda e mais alta que a principal, o que dá
+// origem negativa nos DOIS eixos. Fica aqui como regressão porque é o caso que
+// mais facilmente quebra: é fácil lembrar de X negativo e esquecer o Y.
+const RETRATO_ACIMA_E_A_ESQUERDA = {
+  capturado_em: '2026-08-31T06:54:41-03:00',
+  area_virtual: { x: -1080, y: -178, largura: 3640, altura: 1920 },
+  monitores: [
+    { indice: 0, nome: 'DISPLAY1', principal: true, x: 0, y: 0, largura: 2560, altura: 1440 },
+    { indice: 1, nome: 'DISPLAY2', principal: false, x: -1080, y: -178, largura: 1080, altura: 1920 },
+  ],
+  janelas: [
+    {
+      titulo: 'Editor', processo: 'code', x: 882, y: 57, largura: 1661, altura: 1326,
+      monitor: 0, minimizada: false, em_foco: true, ordem_z: 0,
+    },
+    {
+      titulo: 'Navegador', processo: 'chrome', x: -1087, y: -178, largura: 1094, altura: 967,
+      monitor: 1, minimizada: false, em_foco: false, ordem_z: 1,
+    },
+  ],
+  ocr: [
+    { monitor: 0, idioma: 'pt-BR', escala: 2, linhas: [
+      { texto: 'no editor', x: 1000, y: 200, w: 100, h: 18 },
+    ] },
+    { monitor: 1, idioma: 'pt-BR', escala: 2, linhas: [
+      // Acima do topo da tela principal: y negativo.
+      { texto: 'topo do navegador', x: -1032, y: -168, w: 200, h: 18 },
+      // Na tela de baixo do monitor em pé, já abaixo da janela do navegador.
+      { texto: 'area de trabalho da tela em pe', x: -900, y: 1400, w: 300, h: 18 },
+    ] },
+  ],
+}
+
+test('monitor em pé com origem negativa nos dois eixos', () => {
+  const grupos = agruparTexto(RETRATO_ACIMA_E_A_ESQUERDA)
+
+  const nav = grupos.find((g) => g.janela?.titulo === 'Navegador')
+  assert.deepEqual(
+    nav.linhas.map((l) => l.texto),
+    ['topo do navegador'],
+    'texto em y negativo pertence à janela do monitor em pé',
+  )
+
+  const fora = grupos.find((g) => g.janela === null)
+  assert.deepEqual(
+    fora.linhas.map((l) => l.texto),
+    ['area de trabalho da tela em pe'],
+    'texto abaixo da janela, no mesmo monitor, não pode ser atribuído a ela',
+  )
+
+  const texto = formatar(RETRATO_ACIMA_E_A_ESQUERDA, {
+    grupos, maxLinhas: 120, visao: null, monitorFiltro: null,
+  })
+  assert.match(texto, /1080x1920 em \(-1080,-178\)/)
+  assert.match(texto, /3640x1920 a partir de \(-1080,-178\)/)
+  assert.match(texto, /\(-1032,-168\) topo do navegador/)
+})
+
 test('formatar avisa quando corta linhas pelo limite', () => {
   const texto = formatar(DUAS_TELAS, {
     grupos: agruparTexto(DUAS_TELAS),

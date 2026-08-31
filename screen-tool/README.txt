@@ -59,9 +59,13 @@ TESTES
 
   node --test screen-tool/test.mjs
 
-Cobrem a geometria com duas telas sintéticas, incluindo a segunda em X
-negativo — o arranjo mais comum e o que quebra código que assume coordenada
-não-negativa.
+Cobrem a geometria com duas telas sintéticas, incluindo o arranjo real desta
+máquina: secundária em pé (1080x1920) em (-1080,-178), ou seja, origem negativa
+nos DOIS eixos. É fácil lembrar de X negativo e esquecer o Y.
+
+Conferido em hardware com as duas telas ligadas: duas capturas nas dimensões
+certas, faixas de OCR disjuntas (x 0..2512 contra x -1032..-100), e 169 linhas
+de texto contra 125 com uma tela só.
 
 Para exercitar a captura multi-monitor de verdade com uma tela só, o
 inspect.ps1 tem o gancho -SimularMonitores, que recebe o caminho de um json
