@@ -22,7 +22,7 @@
   que o usuario controla sozinho, sem depender do agente se comportar.
 #>
 param(
-  [Parameter(Mandatory=$true)][ValidateSet('mover','clicar','digitar','teclas','rolar')][string]$Acao,
+  [Parameter(Mandatory=$true)][ValidateSet('mover','clicar','digitar','teclas','rolar','focar')][string]$Acao,
   [int]$X = [int]::MinValue,
   [int]$Y = [int]::MinValue,
   [ValidateSet('left','right','middle')][string]$Botao = 'left',
@@ -55,6 +55,16 @@ public class Win32Act {
   [DllImport("user32.dll", CharSet=CharSet.Unicode)] public static extern int GetWindowTextLengthW(IntPtr h);
   [DllImport("user32.dll")] public static extern short VkKeyScanW(char ch);
   [DllImport("user32.dll")] public static extern uint MapVirtualKeyW(uint code, uint mapType);
+  [DllImport("user32.dll")] public static extern bool EnumWindows(EnumWindowsProc f, IntPtr l);
+  [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr h);
+  [DllImport("user32.dll")] public static extern bool IsIconic(IntPtr h);
+  [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr h, int cmd);
+  [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);
+  [DllImport("user32.dll")] public static extern bool BringWindowToTop(IntPtr h);
+  [DllImport("user32.dll")] public static extern bool AttachThreadInput(uint idAttach, uint idAttachTo, bool attach);
+  [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr h, IntPtr pid);
+  [DllImport("kernel32.dll")] public static extern uint GetCurrentThreadId();
+  public delegate bool EnumWindowsProc(IntPtr h, IntPtr l);
 
   [StructLayout(LayoutKind.Sequential)] public struct POINT { public int X, Y; }
   [StructLayout(LayoutKind.Sequential)] public struct MOUSEINPUT {
@@ -153,6 +163,52 @@ public class Win32Act {
     }
     if (lote.Count > 0) Push(lote.ToArray());
   }
+  // Procura a janela visivel cujo titulo contenha o trecho. Devolve o primeiro
+  // acerto na ordem-Z, ou seja, a mais a frente entre as candidatas.
+  public static IntPtr AcharJanela(string trecho) {
+    IntPtr achada = IntPtr.Zero;
+    string alvo = trecho.ToLowerInvariant();
+    EnumWindows(delegate(IntPtr h, IntPtr l) {
+      if (achada != IntPtr.Zero) return false;
+      if (!IsWindowVisible(h)) return true;
+      string t = TitleOf(h);
+      if (t.Length > 0 && t.ToLowerInvariant().Contains(alvo)) { achada = h; return false; }
+      return true;
+    }, IntPtr.Zero);
+    return achada;
+  }
+  static string TitleOf(IntPtr h) {
+    int n = GetWindowTextLengthW(h);
+    if (n <= 0) return "";
+    var sb = new StringBuilder(n + 2);
+    GetWindowTextW(h, sb, sb.Capacity);
+    return sb.ToString();
+  }
+
+  // Trazer para frente e mais dificil do que parece: o Windows recusa
+  // SetForegroundWindow vindo de um processo que nao tem o foco, justamente
+  // para impedir que aplicativos roubem a tela do usuario. O caminho aceito e
+  // anexar a fila de entrada da thread que tem o foco, mudar, e desanexar.
+  public static bool Focar(IntPtr h) {
+    if (h == IntPtr.Zero) return false;
+    if (IsIconic(h)) ShowWindow(h, 9); // SW_RESTORE
+    IntPtr atual = GetForegroundWindow();
+    if (atual == h) return true;
+
+    uint threadAtual = GetWindowThreadProcessId(atual, IntPtr.Zero);
+    uint threadNossa = GetCurrentThreadId();
+    bool anexou = false;
+    if (threadAtual != 0 && threadAtual != threadNossa)
+      anexou = AttachThreadInput(threadNossa, threadAtual, true);
+    try {
+      BringWindowToTop(h);
+      SetForegroundWindow(h);
+    } finally {
+      if (anexou) AttachThreadInput(threadNossa, threadAtual, false);
+    }
+    return GetForegroundWindow() == h;
+  }
+
   public static void Combo(ushort[] mods, ushort vk) {
     var ev = new System.Collections.Generic.List<INPUT>();
     foreach (ushort m in mods) ev.Add(KeyVk(m, false));
@@ -193,6 +249,31 @@ function Falhar($msg) {
 # VK_SCROLL = 0x91. GetKeyState devolve o bit 0 ligado quando o LED esta aceso.
 if (([Win32Act]::GetKeyState(0x91) -band 1) -ne 0) {
   Falhar 'Scroll Lock esta ligado: injecao de mouse e teclado bloqueada pelo usuario. Desligue para permitir.'
+}
+
+# -- focar -------------------------------------------------------------------
+# Sai por aqui antes da verificacao de alvo: focar e o unico caso em que a
+# janela esperada NAO esta no alvo — e justamente por isso que se quer focar.
+if ($Acao -eq 'focar') {
+  if (-not $JanelaEsperada) { Falhar "A acao 'focar' exige -JanelaEsperada com parte do titulo." }
+  $alvo = [Win32Act]::AcharJanela($JanelaEsperada)
+  if ($alvo -eq [IntPtr]::Zero) {
+    Falhar ("Nenhuma janela visivel com '{0}' no titulo." -f $JanelaEsperada)
+  }
+  $resultado.janela_no_alvo = [Win32Act]::TitleAt($alvo)
+  if ($Simular) {
+    $resultado.simulado = $true
+    ($resultado | ConvertTo-Json -Depth 5 -Compress); exit 0
+  }
+  $ok = [Win32Act]::Focar($alvo)
+  Start-Sleep -Milliseconds 120
+  $resultado.janela_em_foco_depois = [Win32Act]::TitleAt([Win32Act]::GetForegroundWindow())
+  if (-not $ok -and $resultado.janela_em_foco_depois -ne $resultado.janela_no_alvo) {
+    Falhar ("Nao consegui trazer '{0}' para a frente; quem esta em foco e '{1}'." -f `
+      $resultado.janela_no_alvo, $resultado.janela_em_foco_depois)
+  }
+  $resultado.feito = $true
+  ($resultado | ConvertTo-Json -Depth 5 -Compress); exit 0
 }
 
 # -- alvo e verificacao ------------------------------------------------------

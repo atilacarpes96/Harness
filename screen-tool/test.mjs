@@ -12,7 +12,14 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { agruparTexto, formatar, janelaDaLinha, montarArgumentos } from './index.js'
+import {
+  acharTexto,
+  agruparTexto,
+  formatar,
+  janelaDaLinha,
+  montarArgumentos,
+  normalizar,
+} from './index.js'
 
 // -- camada de controle ------------------------------------------------------
 // A regra que importa: ver a tela e agir são chamadas separadas, e entre uma e
@@ -251,6 +258,76 @@ test('monitor em pé com origem negativa nos dois eixos', () => {
   assert.match(texto, /1080x1920 em \(-1080,-178\)/)
   assert.match(texto, /3640x1920 a partir de \(-1080,-178\)/)
   assert.match(texto, /\(-1032,-168\) topo do navegador/)
+})
+
+// -- achar texto para clicar -------------------------------------------------
+// O OCR troca acento e caixa o tempo todo. Exigir igualdade exata faria a
+// automação falhar por um "ç" mal lido, então a comparação é tolerante.
+
+test('normalizar tira acento, caixa e espaço sobrando', () => {
+  assert.equal(normalizar('  Ação   Não  '), 'acao nao')
+  assert.equal(normalizar('ÇÃOÉÊÕ'), 'caoeeo')
+  assert.equal(normalizar(null), '')
+})
+
+test('acharTexto encontra mesmo com acento diferente do original', () => {
+  const dados = {
+    janelas: DUAS_TELAS.janelas,
+    ocr: [{ monitor: 0, linhas: [{ texto: 'Configurações', x: 200, y: 100, w: 120, h: 20 }] }],
+  }
+  const r = acharTexto(dados, 'configuracoes')
+  assert.equal(r.length, 1)
+  assert.equal(r[0].janela.titulo, 'Editor')
+})
+
+test('acharTexto devolve o centro da linha, que é onde se clica', () => {
+  const dados = {
+    janelas: DUAS_TELAS.janelas,
+    ocr: [{ monitor: 0, linhas: [{ texto: 'Salvar', x: 200, y: 100, w: 80, h: 20 }] }],
+  }
+  assert.deepEqual(
+    (({ x, y }) => ({ x, y }))(acharTexto(dados, 'salvar')[0]),
+    { x: 240, y: 110 },
+  )
+})
+
+test('acharTexto acha coisa na tela de coordenada negativa', () => {
+  const r = acharTexto(DUAS_TELAS, 'aba do navegador')
+  assert.equal(r.length, 1)
+  assert.equal(r[0].janela.titulo, 'Navegador')
+  assert.ok(r[0].x < 0, 'a coordenada de clique continua negativa')
+})
+
+test('acharTexto devolve TODAS as ocorrências, para quem chama poder recusar', () => {
+  const dados = {
+    janelas: DUAS_TELAS.janelas,
+    ocr: [{ monitor: 0, linhas: [
+      { texto: 'Salvar', x: 200, y: 100, w: 80, h: 20 },
+      { texto: 'Salvar como', x: 200, y: 300, w: 140, h: 20 },
+    ] }],
+  }
+  assert.equal(acharTexto(dados, 'salvar').length, 2, 'ambiguidade tem que ser visível para quem chama')
+})
+
+test('acharTexto restringe por janela para desempatar', () => {
+  const dados = {
+    janelas: DUAS_TELAS.janelas,
+    ocr: [
+      { monitor: 0, linhas: [{ texto: 'Fechar', x: 200, y: 100, w: 80, h: 20 }] },
+      { monitor: 1, linhas: [{ texto: 'Fechar', x: -1800, y: 60, w: 80, h: 20 }] },
+    ],
+  }
+  assert.equal(acharTexto(dados, 'fechar').length, 2)
+  const so = acharTexto(dados, 'fechar', 'Navegador')
+  assert.equal(so.length, 1)
+  assert.ok(so[0].x < 0, 'sobrou a do monitor da esquerda')
+})
+
+test('focar não é forçado a simular, mas leva a janela alvo', () => {
+  const r = montarArgumentos({ acao: 'focar', janela_esperada: 'Bloco' })
+  assert.equal(r.semConfirmacao, false, 'focar não muda conteúdo, só traz para frente')
+  assert.ok(!r.ps.includes('-Simular'))
+  assert.deepEqual(r.ps.slice(-2), ['-JanelaEsperada', 'Bloco'])
 })
 
 test('formatar avisa quando corta linhas pelo limite', () => {

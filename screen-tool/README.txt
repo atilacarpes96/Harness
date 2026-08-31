@@ -95,11 +95,47 @@ CAMADA DE CONTROLE — interagir_tela (act.ps1)
 Move o mouse, clica, digita, envia combinações e rola. Consome as MESMAS
 coordenadas que o analisar_tela devolve, sem conversão no meio.
 
+Preferidas, por serem as que não exigem calcular coordenada:
+
+  interagir_tela {"acao":"clicar_texto","texto":"Salvar"}
+  interagir_tela {"acao":"focar","janela_esperada":"Bloco de notas"}
+
+Primitivas, para quando não há texto no alvo:
+
   interagir_tela {"acao":"mover",  "x":-550,"y":360}
   interagir_tela {"acao":"clicar", "x":-550,"y":360,"janela_esperada":"Bloco"}
   interagir_tela {"acao":"digitar","texto":"ação","janela_esperada":"Bloco"}
   interagir_tela {"acao":"teclas", "teclas":"ctrl+shift+end","janela_esperada":"Bloco"}
   interagir_tela {"acao":"rolar",  "x":100,"y":100,"quantidade":-3}
+
+CLICAR POR TEXTO
+
+`clicar_texto` acha o texto pelo OCR e clica no centro da linha. É a forma mais
+confiável de automatizar: o modelo não precisa ler o mapa da tela nem calcular
+coordenada, e o alvo é verificado no instante do clique — "cliquei no que dizia
+Salvar" é garantia mais forte que um título de janela.
+
+A comparação é tolerante a acento e caixa, porque o OCR troca os dois com
+frequência e exigir igualdade exata faria a automação falhar por um ç mal lido.
+
+O que ela NÃO faz é escolher por você:
+
+- texto em vários lugares -> não clica; devolve os candidatos com coordenada e
+  a janela de cada um, para desempatar com `janela_esperada`
+- texto ausente -> não clica; lista os textos parecidos que estão visíveis,
+  porque quase sempre é o OCR tendo lido uma letra errada
+
+FOCAR
+
+Trazer para frente é mais difícil do que parece: o Windows recusa
+SetForegroundWindow vindo de processo sem foco, para impedir que aplicativos
+roubem a tela. O caminho aceito é anexar a fila de entrada da thread que tem o
+foco, trocar, e desanexar — é o que `focar` faz, junto com restaurar a janela se
+estiver minimizada.
+
+Serve para o caso que aparece o tempo todo na prática: a janela alvo existe mas
+está atrás de outra. Aconteceu na primeira vez que este projeto foi publicado —
+o diálogo de credencial do git ficou escondido atrás do GitHub Desktop.
 
 TRÊS TRAVAS, e por que cada uma existe:
 

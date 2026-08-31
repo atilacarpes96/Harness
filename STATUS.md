@@ -88,6 +88,22 @@ consumindo as mesmas coordenadas que a percepção devolve. Verificado com o
 modelo local de 4B fazendo o laço inteiro sozinho — ver a tela, achar a janela,
 clicar e digitar — com o texto conferido byte a byte no controle de destino.
 
+**Automação começou em 31/08**, com duas capacidades acima das primitivas:
+
+- **`clicar_texto`** — acha o texto pelo OCR e clica nele. É o que torna a
+  automação viável num modelo de 4B: ele não precisa ler 125 linhas de mapa da
+  tela e calcular coordenada, que é onde errava. Quando o texto aparece em
+  vários lugares ela **não escolhe** — devolve os candidatos; adivinhar
+  reintroduziria o clique às cegas que as travas existem para impedir.
+- **`focar`** — traz uma janela para frente. Necessário porque o Windows recusa
+  `SetForegroundWindow` de processo sem foco; o caminho é anexar a fila de
+  entrada da thread em foco. Foi a lacuna que apareceu na prática quando o
+  diálogo de credencial do git ficou escondido atrás do GitHub Desktop.
+
+Verificado com o modelo local encadeando as duas sozinho (focar o GitHub Desktop
+e clicar em History), com o resultado **conferido por leitura independente da
+tela**, e não pelo relato do agente.
+
 Isso muda a categoria do plugin: **observar é reversível, agir não é.** Daí as
 três travas, descritas em `screen-tool/README.txt`:
 

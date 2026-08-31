@@ -309,6 +309,95 @@ function construirFerramenta(nomeFerramenta) {
 // às cegas por construção, em vez de por boa vontade.
 const ACOES_QUE_MUDAM = new Set(['clicar', 'digitar', 'teclas'])
 
+// Comparação tolerante: o OCR troca acento e caixa com frequência, e exigir
+// igualdade exata faria a automação falhar por causa de um "ç" mal lido.
+export function normalizar(s) {
+  return String(s ?? '')
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+// Todas as linhas de OCR que contêm o texto procurado, com a janela de cada uma.
+export function acharTexto(dados, procurado, filtroJanela) {
+  const alvo = normalizar(procurado)
+  if (!alvo) return []
+  const janela = filtroJanela ? normalizar(filtroJanela) : null
+  const achados = []
+
+  for (const bloco of dados.ocr) {
+    for (const linha of bloco.linhas) {
+      if (!normalizar(linha.texto).includes(alvo)) continue
+      const j = janelaDaLinha(linha, dados.janelas)
+      if (janela && !normalizar(j?.titulo).includes(janela)) continue
+      achados.push({
+        texto: linha.texto,
+        // Centro da linha: é onde um humano clicaria, e onde o controle está.
+        x: linha.x + Math.round(linha.w / 2),
+        y: linha.y + Math.round(linha.h / 2),
+        janela: j,
+      })
+    }
+  }
+  return achados
+}
+
+async function clicarEmTexto(args) {
+  const procurado = String(args?.texto ?? '').trim()
+  if (!procurado) return 'Erro: informe em `texto` o que deve ser clicado.'
+
+  const dados = await inspecionar({ comVisao: false })
+  const filtro = typeof args?.janela_esperada === 'string' ? args.janela_esperada.trim() : ''
+  const achados = acharTexto(dados, procurado, filtro)
+
+  if (achados.length === 0) {
+    // Devolver vizinhança ajuda mais que só dizer "não achei": quase sempre o
+    // texto está lá com uma letra trocada pelo OCR.
+    const todas = dados.ocr.flatMap((b) => b.linhas)
+    const parecidas = todas
+      .filter((l) => {
+        const n = normalizar(l.texto)
+        return normalizar(procurado)
+          .split(' ')
+          .some((p) => p.length > 2 && n.includes(p))
+      })
+      .slice(0, 8)
+      .map((l) => `  (${l.x},${l.y}) ${l.texto}`)
+    return [
+      `Não encontrei "${procurado}" na tela. Nada foi clicado.`,
+      parecidas.length ? 'Textos parecidos que estão visíveis:' : 'Nenhum texto parecido visível.',
+      ...parecidas,
+    ].join('\n')
+  }
+
+  if (achados.length > 1) {
+    return [
+      `"${procurado}" aparece ${achados.length} vezes. NÃO cliquei — escolher por conta seria clicar às cegas.`,
+      'Candidatos:',
+      ...achados
+        .slice(0, 10)
+        .map((a, i) => `  ${i + 1}. (${a.x},${a.y}) em "${a.janela?.titulo ?? 'fora de janela'}" — ${a.texto}`),
+      'Repita com janela_esperada para restringir, ou use a ação "clicar" com x/y de um destes.',
+    ].join('\n')
+  }
+
+  const alvo = achados[0]
+  const resultado = await executarAcao({
+    acao: 'clicar',
+    x: alvo.x,
+    y: alvo.y,
+    botao: args?.botao,
+    duplo: args?.duplo,
+    simular: args?.simular,
+    // O clique já é verificado pelo próprio texto estar ali; a janela entra
+    // como segunda checagem, no momento do clique.
+    janela_esperada: alvo.janela?.titulo ?? 'Program Manager',
+  })
+  return `Alvo: "${alvo.texto}" em (${alvo.x},${alvo.y}), dentro de "${alvo.janela?.titulo ?? 'área de trabalho'}".\n${resultado}`
+}
+
 // Pura, para poder ser testada sem mover o mouse de ninguém.
 export function montarArgumentos(args) {
   const acao = String(args?.acao ?? '').trim()
@@ -387,22 +476,27 @@ function construirFerramentaAcao() {
   return {
     name: 'interagir_tela',
     description:
-      'Move o mouse, clica, digita texto, envia combinações de teclas ou rola a tela. ' +
-      'Usa as MESMAS coordenadas devolvidas por analisar_tela. Chame analisar_tela antes, ' +
-      'para saber onde clicar e qual o título da janela alvo. Para clicar, digitar ou teclar ' +
-      'é obrigatório informar janela_esperada: sem isso a chamada só simula e informa o que ' +
-      'encontrou no alvo.',
+      'Age na tela. Prefira "clicar_texto" (acha o texto e clica nele) a calcular ' +
+      'coordenada: é mais confiável e dispensa ler o mapa da tela. Use "focar" para trazer ' +
+      'uma janela para frente antes de digitar nela. Para "clicar", "digitar" e "teclas" é ' +
+      'obrigatório informar janela_esperada; sem isso a chamada apenas simula e informa o ' +
+      'que encontrou no alvo.',
     parameters: {
       type: 'object',
       properties: {
         acao: {
           type: 'string',
-          enum: ['mover', 'clicar', 'digitar', 'teclas', 'rolar'],
-          description: 'O que fazer.',
+          enum: ['clicar_texto', 'focar', 'mover', 'clicar', 'digitar', 'teclas', 'rolar'],
+          description:
+            'clicar_texto: acha o texto na tela e clica nele (use `texto`). ' +
+            'focar: traz uma janela para frente (use `janela_esperada`).',
         },
         x: { type: 'integer', description: 'Coordenada X do alvo (mover, clicar, rolar).' },
         y: { type: 'integer', description: 'Coordenada Y do alvo (mover, clicar, rolar).' },
-        texto: { type: 'string', description: 'Texto a digitar (ação digitar).' },
+        texto: {
+          type: 'string',
+          description: 'O que digitar (ação digitar), ou o que procurar e clicar (ação clicar_texto).',
+        },
         teclas: {
           type: 'string',
           description: 'Combinação, por exemplo "ctrl+s", "enter", "shift+end" (ação teclas).',
@@ -416,7 +510,8 @@ function construirFerramentaAcao() {
         janela_esperada: {
           type: 'string',
           description:
-            'Parte do título da janela que deve estar no alvo. Obrigatório para clicar, digitar e teclas.',
+            'Parte do título da janela. Obrigatório para clicar, digitar, teclas e focar. ' +
+            'Em clicar_texto é opcional, e serve para desempatar quando o texto aparece em vários lugares.',
         },
         simular: { type: 'boolean', description: 'Só dizer o que faria, sem fazer.' },
       },
@@ -427,8 +522,9 @@ function construirFerramentaAcao() {
       schema: { type: 'string' },
       render: (_args, value) => [{ type: 'text', text: value }],
     },
-    timeoutMs: 90_000,
-    execute: executarAcao,
+    timeoutMs: 120_000,
+    execute: (args) =>
+      args?.acao === 'clicar_texto' ? clicarEmTexto(args) : executarAcao(args),
   }
 }
 
