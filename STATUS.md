@@ -121,6 +121,14 @@ ou dois caracteres passou a exigir igualdade** em vez de "contém".
 Validado ponta a ponta: `7 + 8 =` na Calculadora, com o **15 conferido lendo a
 tela depois**.
 
+**`ler_elemento` fecha o laço agir → conferir** sem passar pelo OCR, que errava
+justamente onde a conferência precisa acertar: número, campo curto, símbolo. A
+Calculadora expõe `CalculatorExpression` e `CalculatorResults` com a conta
+inteira. Verificado com 3 contas feitas por clique e batidas contra o valor
+calculado em JavaScript — **3/3** —, e depois com o modelo local fazendo o ciclo
+sozinho (calcular 6×9 e conferir o próprio resultado), com o valor confirmado
+por leitura independente.
+
 ## Inicializador
 
 `iniciar.ps1` + ícone na Área de Trabalho (`instalar-atalho.ps1`, roda uma vez).

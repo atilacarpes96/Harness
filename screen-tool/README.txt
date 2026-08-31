@@ -135,6 +135,25 @@ Windows, enquanto o nome muda ("Mais" / "Plus").
 
 Custo: ~90ms para achar a janela, ~50ms para varrer os controles.
 
+LER O CONTEUDO DE UM CONTROLE
+
+`ler_elemento` devolve o valor exato de um controle, e e o que fecha o laco
+agir -> conferir sem passar pelo OCR:
+
+  interagir_tela {"acao":"ler_elemento","texto":"CalculatorResults","janela_esperada":"Calculadora"}
+  -> "A exibicao e 54"
+
+Sem `texto`, lista tudo que tem conteudo naquela janela — util para descobrir de
+onde ler. Na Calculadora:
+
+  AppName              = "Calculadora"
+  CalculatorExpression = "Expression e 6 x 9="
+  CalculatorResults    = "A exibicao e 54"
+
+Isso importa porque o OCR erra justamente onde a conferencia precisa acertar:
+numero, campo curto, simbolo. Verificado com 3 contas feitas por clique e
+conferidas contra o valor calculado em JavaScript: 3/3.
+
 Primitivas, para quando não há texto no alvo:
 
   interagir_tela {"acao":"mover",  "x":-550,"y":360}

@@ -416,6 +416,46 @@ export function acharElemento(elementos, procurado) {
   )
 }
 
+// Fecha o laço agir -> conferir sem passar pelo OCR. Importa porque o OCR erra
+// exatamente onde a conferência precisa acertar: número, campo curto, símbolo.
+async function lerElemento(args) {
+  const procurado = String(args?.texto ?? '').trim()
+  const janela = String(args?.janela_esperada ?? '').trim()
+  if (!janela) return 'Erro: informe em `janela_esperada` a janela onde ler.'
+
+  const dados = await lerElementos(janela)
+  if (dados.erro) {
+    return `${dados.erro}\nJanelas abertas: ${(dados.janelas_abertas ?? []).join(' | ')}`
+  }
+  const todos = dados.elementos ?? []
+
+  // Sem alvo, devolve tudo que tem conteúdo: serve para descobrir de onde ler.
+  if (!procurado) {
+    const comConteudo = todos.filter((e) => e.valor || e.tipo === 'Text')
+    if (comConteudo.length === 0) return `Nenhum controle com conteúdo em "${dados.janela}".`
+    return [
+      `CONTEÚDO de "${dados.janela}"`,
+      ...comConteudo.map((e) => `  ${e.id || e.nome} = ${JSON.stringify(e.valor ?? e.nome)}`),
+    ].join('\n')
+  }
+
+  const achados = acharElemento(todos, procurado)
+  if (achados.length === 0) {
+    return `Não há controle "${procurado}" em "${dados.janela}".`
+  }
+  if (achados.length > 1) {
+    return [
+      `"${procurado}" casa com ${achados.length} controles:`,
+      ...achados.slice(0, 10).map((e) => `  "${e.nome}" (id: ${e.id})`),
+      'Repita usando o id, que é exato.',
+    ].join('\n')
+  }
+
+  const e = achados[0]
+  const conteudo = e.valor ?? e.nome
+  return `"${e.nome || e.id}" (${e.tipo}) = ${JSON.stringify(conteudo)}`
+}
+
 async function clicarElemento(args) {
   const procurado = String(args?.texto ?? '').trim()
   const janela = String(args?.janela_esperada ?? '').trim()
@@ -663,11 +703,13 @@ function construirFerramentaAcao() {
         acao: {
           type: 'string',
           enum: [
-            'clicar_elemento', 'clicar_texto', 'esperar', 'focar',
+            'clicar_elemento', 'ler_elemento', 'clicar_texto', 'esperar', 'focar',
             'mover', 'clicar', 'digitar', 'teclas', 'rolar',
           ],
           description:
             'clicar_elemento: clica um controle pelo nome ou id (use `texto` e `janela_esperada`). ' +
+            'ler_elemento: le o conteudo exato de um controle, para conferir o efeito de uma acao ' +
+            '(use `janela_esperada`; sem `texto` lista tudo que tem conteudo). ' +
             'clicar_texto: acha o texto na tela e clica nele (use `texto`). ' +
             'esperar: aguarda algo aparecer antes de seguir (use `texto`). ' +
             'focar: traz uma janela para frente (use `janela_esperada`).',
@@ -716,6 +758,7 @@ function construirFerramentaAcao() {
     timeoutMs: 120_000,
     execute: (args) => {
       if (args?.acao === 'clicar_elemento') return clicarElemento(args)
+      if (args?.acao === 'ler_elemento') return lerElemento(args)
       if (args?.acao === 'clicar_texto') return clicarEmTexto(args)
       if (args?.acao === 'esperar') return esperar(args)
       return executarAcao(args)

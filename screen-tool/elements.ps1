@@ -73,10 +73,22 @@ foreach ($e in $todos) {
   $id = $c.AutomationId
   if (-not $nome -and -not $id) { continue }
 
+  # Valor do controle, quando ele expoe um. E o que fecha o laco agir->conferir
+  # sem depender do OCR: campo de texto, visor, caixa de selecao. ValuePattern
+  # cobre edit/combo; para Text o proprio Name ja carrega o conteudo.
+  $valor = $null
+  try {
+    $pat = $null
+    if ($e.TryGetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern, [ref]$pat)) {
+      $valor = $pat.Current.Value
+    }
+  } catch { }
+
   $itens += [pscustomobject]@{
     nome = $nome
     id = $id
     tipo = $tipo
+    valor = $valor
     x = [int]($r.X + $r.Width / 2)
     y = [int]($r.Y + $r.Height / 2)
     largura = [int]$r.Width
