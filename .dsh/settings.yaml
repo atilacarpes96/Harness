@@ -92,5 +92,7 @@ web-search-deepseek:
   apiKeyEnv: OLLAMA_LAUNCH_DSH_API_KEY
   baseURL: http://127.0.0.1:11434/v1
   model: qwen3-vl:8b
+agent-presets:
+  default: enxuto
 ui-onboarding:
   welcomeNoticeVersion: 2026-08-13.1

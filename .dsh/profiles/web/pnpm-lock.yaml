@@ -9,22 +9,8 @@ importers:
   .:
     dependencies:
       dsh-safe-developer:
-        specifier: file:E:/DSHARNESS/dsh-safe-developer
-        version: file:../../../dsh-safe-developer
+        specifier: link:E:/DSHARNESS/dsh-safe-developer
+        version: link:../../../dsh-safe-developer
       dsh-screen-analyzer:
-        specifier: file:E:/DSHARNESS/screen-tool
-        version: file:../../../screen-tool
-
-packages:
-
-  dsh-safe-developer@file:../../../dsh-safe-developer:
-    resolution: {directory: ../../../dsh-safe-developer, type: directory}
-
-  dsh-screen-analyzer@file:../../../screen-tool:
-    resolution: {directory: ../../../screen-tool, type: directory}
-
-snapshots:
-
-  dsh-safe-developer@file:../../../dsh-safe-developer: {}
-
-  dsh-screen-analyzer@file:../../../screen-tool: {}
+        specifier: link:E:/DSHARNESS/screen-tool
+        version: link:../../../screen-tool

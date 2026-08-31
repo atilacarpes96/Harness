@@ -12,7 +12,7 @@
     }
   },
   "dependencies": {
-    "dsh-safe-developer": "file:E:/DSHARNESS/dsh-safe-developer",
-    "dsh-screen-analyzer": "file:E:/DSHARNESS/screen-tool"
+    "dsh-safe-developer": "link:E:/DSHARNESS/dsh-safe-developer",
+    "dsh-screen-analyzer": "link:E:/DSHARNESS/screen-tool"
   }
 }

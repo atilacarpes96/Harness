@@ -1,0 +1,88 @@
+# Preset "enxuto" — cópia do `standard` com as ferramentas que este harness não
+# usa removidas.
+#
+# Por quê: medido em 31/08/2026 (harness-bench/results/overhead-2026-08-31.md),
+# o inventário de ferramentas era 87% do payload de TODA chamada — 8.710 tokens
+# de prompt pra uma pergunta trivial. Num modelo local de 4B isso é caro em
+# tempo e, pior, competia por um contexto que o Ollama estava limitando a 4096.
+#
+# O que saiu em relação ao `standard`: tool-jobs, skill-filesystem, tool-skill,
+# command-goal, tool-goal, o grupo `planning` (exit_plan_mode), o grupo
+# `delegation` inteiro (subagent, subagent_fork, list_agents, interrupt_agent,
+# send_message, workflow, ralph), tool-todo e tool-web.
+#
+# O que ficou: shell, arquivos, busca em arquivos, perguntar ao usuário, e a
+# compactação de contexto (que não é ferramenta — é o que impede a sessão de
+# estourar o contexto).
+#
+# As ferramentas dos plugins locais (`analisar_tela`, `validar_plugin_local`)
+# NÃO aparecem aqui de propósito: elas são registradas no plano do host pelos
+# bundles do profile (`.dsh/profiles/web/package.json`), então chegam no agente
+# independente do preset.
+#
+# Pra voltar alguma coisa: copiar a linha correspondente do preset `standard`
+# em `.dsh/profiles/node_modules/@deepseek-ai/dsh-agent-presets/presets/standard/`.
+
+# ── identidade ──────────────────────────────────────────────────────────────
+
+- id: persona
+  name: '@deepseek-ai/dsh-persona'
+  config:
+    text: >-
+      You are a coding agent powered by the {{model}} model. Your working directory is {{cwd}}.
+
+- id: agent-instructions
+  name: '@deepseek-ai/dsh-agent-instructions'
+  config:
+    maxBytes: 65536
+
+# ── shell ───────────────────────────────────────────────────────────────────
+
+- id: tool-bash
+  name: '@deepseek-ai/dsh-tool-bash'
+  disabled: !!js process.platform === 'win32'
+
+- id: tool-pwsh
+  name: '@deepseek-ai/dsh-tool-pwsh'
+  disabled: !!js process.platform !== 'win32'
+
+# ── arquivos ────────────────────────────────────────────────────────────────
+
+- id: tool-fs
+  name: '@deepseek-ai/dsh-tool-fs'
+
+- id: tool-fs-search
+  name: '@deepseek-ai/dsh-tool-fs-search'
+  config:
+    sampleOverCapGlobResults: false
+
+# ── compactação ─────────────────────────────────────────────────────────────
+#
+# Não é ferramenta visível ao modelo: é o que mantém a sessão dentro do
+# contexto. `tokenMeter` fica no host de propósito (o navegador lê o medidor
+# dele); as linhas daqui resolvem aquela instância.
+
+- id: compaction
+  name: cordis:group
+  group: true
+  isolate:
+    compaction: true
+    toolResultPruner: true
+  config:
+    - id: compaction-basic
+      name: '@deepseek-ai/dsh-compaction-basic'
+
+    - id: command-compact
+      name: '@deepseek-ai/dsh-command-compact'
+
+    - id: tool-result-pruner
+      name: '@deepseek-ai/dsh-compaction-tool-result-pruner'
+      config:
+        thresholdChars: 8192
+        headChars: 4096
+        tailChars: 1024
+
+# ── restante ────────────────────────────────────────────────────────────────
+
+- id: tool-ask-user
+  name: '@deepseek-ai/dsh-tool-ask-user'

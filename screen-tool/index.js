@@ -268,17 +268,15 @@ function buildAnalisarTelaTool(name) {
   }
 }
 
-// Modelos menores (ex. qwen3-vl:4b-instruct) variam a forma que inventam
-// pro nome da ferramenta em vez de usar "analisar_tela" literalmente.
-// Cobre as variações observadas em vez de perseguir uma de cada vez.
-const TOOL_NAME_ALIASES = [
-  'analisar_tela',
-  'analise_tela',
-  'analises_tela',
-  'analisa_tela',
-  'ver_tela',
-  'capturar_tela',
-]
+// Modelos menores erravam o nome da ferramenta, e a resposta na época foi
+// registrar 6 apelidos. Em 31/08/2026 descobrimos que o motivo real era outro:
+// o Ollama rodava com num_ctx 4096 e truncava ~76% do prompt, então o modelo
+// muitas vezes nem via a lista de ferramentas inteira. Com o contexto correto
+// (dsh-4b:16k) o nome literal passou a ser acertado.
+//
+// Cada apelido custa ~400 chars de schema em TODA chamada, então sobrou só um
+// segundo nome — "ver_tela" é o que mais aparecia — como rede de segurança.
+const TOOL_NAME_ALIASES = ['analisar_tela', 'ver_tela']
 
 export function apply(ctx) {
   for (const name of TOOL_NAME_ALIASES) {
