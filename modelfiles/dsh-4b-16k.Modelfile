@@ -1,0 +1,19 @@
+# qwen3-vl:4b-instruct com contexto de 16k.
+#
+# Por que existe: o Ollama escolhe num_ctx=4096 sozinho ("vram-based default
+# context", visível no log do serve) e o endpoint /v1 (OpenAI-compat) IGNORA
+# num_ctx vindo no corpo da requisição — testado com options.num_ctx e com
+# num_ctx no topo, os dois sem efeito. O `contextWindow: 32768` do
+# settings.yaml é só o que o dsh acredita, não chega no Ollama.
+#
+# Consequência do 4096: o inventário padrão do agente (32 ferramentas) dá 8710
+# tokens de prompt, então ~76% de TODA chamada era truncado silenciosamente.
+# Um PARAMETER num_ctx no modelo é o único lugar que o endpoint /v1 respeita.
+#
+# Custo de VRAM: KV cache 576 MiB a 4096 -> ~2,3 GB a 16384. Com o modelo
+# (2374 MiB) dá ~4,8 GB dos 12,3 GB da placa.
+#
+#   ollama create dsh-4b:16k -f modelfiles/dsh-4b-16k.Modelfile
+
+FROM qwen3-vl:4b-instruct
+PARAMETER num_ctx 16384

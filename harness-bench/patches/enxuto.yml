@@ -1,0 +1,50 @@
+# Overlay "enxuto": corta as ferramentas que este harness não usa, pra reduzir o
+# inventário de schemas enviado em TODA chamada ao modelo.
+#
+# Medido no profile headless (ver harness-bench/results/requests.jsonl):
+# o inventário de ferramentas era 87% do payload de uma pergunta trivial.
+#
+#   dsh --profile headless --patch harness-bench/patches/enxuto.yml "sua pergunta"
+#
+# Mantém: pwsh, read/write/edit/read_image, glob/grep, e os plugins locais
+# (analisar_tela, validar_plugin_local).
+
+# Orquestração multi-agente — nunca usada aqui, e cara (workflow sozinho = 4032 chars)
+- id: tool-workflow
+  disabled: true
+- id: workflow-worker-thread
+  disabled: true
+- id: tool-ralph
+  disabled: true
+- id: tool-subagent
+  disabled: true
+- id: tool-subagent-fork
+  disabled: true
+- id: tool-subagent-list-agents
+  disabled: true
+- id: tool-subagent-control
+  disabled: true
+
+# Goals / todos / plano — cerimônia de agente longo, irrelevante pra turno curto
+- id: tool-goal
+  disabled: true
+- id: tool-todo
+  disabled: true
+- id: plan-mode
+  disabled: true
+
+# Busca web: aponta pro Ollama local, não é busca de verdade neste setup
+- id: tool-web
+  disabled: true
+
+# Skills: nenhuma skill instalada neste profile
+- id: tool-skill
+  disabled: true
+
+# Jobs em background: modelo pequeno não gerencia isso bem
+- id: tool-jobs
+  disabled: true
+
+# str_replace_editor (3148 chars) é redundante com read/write/edit do tool-fs
+- id: tool-str-replace-editor
+  disabled: true

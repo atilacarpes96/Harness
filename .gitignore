@@ -17,3 +17,6 @@ screenshot-tool.png
 
 # estado local do Claude Code
 .claude/
+
+# payloads brutos capturados pelo proxy-log (grandes, regeneráveis)
+harness-bench/results/requests.jsonl
