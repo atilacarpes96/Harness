@@ -100,6 +100,19 @@ Ordem de preferência — de cima para baixo, da mais confiável para a menos:
   interagir_tela {"acao":"clicar_elemento","texto":"plusButton","janela_esperada":"Calculadora"}
   interagir_tela {"acao":"clicar_texto","texto":"Salvar"}
   interagir_tela {"acao":"focar","janela_esperada":"Bloco de notas"}
+  interagir_tela {"acao":"esperar","texto":"Salvar","janela_esperada":"Bloco","segundos":10}
+
+ESPERAR
+
+Sem isto toda automação é uma corrida: o passo seguinte acontece antes de a
+interface responder ao anterior. `esperar` sonda até o alvo aparecer, ou até o
+tempo acabar, e aí diz o que viu em vez de travar.
+
+Informe `janela_esperada` sempre que souber a janela: a sondagem vai pela árvore
+de acessibilidade, que custa ~0,14s por ciclo, contra ~2,6s do OCR.
+
+Para aguardar algo SUMIR — uma barra de progresso, um "carregando" — use
+`"sumir": true`.
 
 CLICAR POR CONTROLE (o melhor caminho)
 

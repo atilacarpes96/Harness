@@ -16,6 +16,9 @@
 #>
 param(
   [switch]$SemAquecer,
+  # Encerra instancias antigas do dsh antes de subir. Util depois de fechar a
+  # janela sem encerrar o processo, que deixa a porta presa.
+  [switch]$Limpar,
   [int]$Porta = 3080
 )
 
@@ -49,6 +52,45 @@ Write-Host ''
 Write-Host '  DSHARNESS' -ForegroundColor White
 Write-Host '  agente local com consciencia de tela' -ForegroundColor DarkGray
 Write-Host ''
+
+# -- 0. instancias antigas ---------------------------------------------------
+# Fechar a janela do navegador nao encerra o servidor: o processo fica vivo
+# segurando a porta, e o proximo boot morre com EADDRINUSE. Aqui a gente ao
+# menos avisa; com -Limpar, encerra.
+function DshEmExecucao {
+  $achados = @()
+  foreach ($p in 3080..3090) {
+    try {
+      $conns = Get-NetTCPConnection -LocalPort $p -State Listen -ErrorAction Stop
+    } catch { continue }
+    foreach ($c in $conns) {
+      $proc = Get-CimInstance Win32_Process -Filter ("ProcessId = {0}" -f $c.OwningProcess) -ErrorAction SilentlyContinue
+      if (-not $proc) { continue }
+      # So mexe no que for claramente uma instancia do dsh: nunca derrubar um
+      # node alheio so por estar numa porta vizinha.
+      if ($proc.CommandLine -and $proc.CommandLine -match 'dsh') {
+        $achados += [pscustomobject]@{ Porta = $p; Pid = $c.OwningProcess; Nome = $proc.Name }
+      }
+    }
+  }
+  return $achados
+}
+
+$antigas = DshEmExecucao
+if ($antigas) {
+  if ($Limpar) {
+    Passo 0 'Encerrando instancias antigas'
+    foreach ($a in $antigas) {
+      Stop-Process -Id $a.Pid -Force -ErrorAction SilentlyContinue
+      Ok ("porta {0} liberada (pid {1})" -f $a.Porta, $a.Pid)
+    }
+    Start-Sleep -Milliseconds 800
+  } else {
+    Passo 0 'Instancias antigas encontradas'
+    foreach ($a in $antigas) { Aviso ("porta {0} ocupada por {1} (pid {2})" -f $a.Porta, $a.Nome, $a.Pid) }
+    Aviso 'use -Limpar para encerrar todas antes de subir'
+  }
+}
 
 # -- 1. Ollama ---------------------------------------------------------------
 Passo 1 'Verificando o Ollama'

@@ -32,6 +32,14 @@ Depois é só o ícone. Ele confere o Ollama (e sobe, se preciso), confere o mod
 padrão, aquece o modelo e abre a interface — parando com uma mensagem útil se
 algum passo falhar, em vez de abrir algo quebrado.
 
+Fechar a janela do navegador **não** encerra o servidor: o processo continua
+segurando a porta. O inicializador avisa quando encontra instâncias antigas, e
+`-Limpar` encerra todas antes de subir:
+
+```bash
+powershell -ExecutionPolicy Bypass -File iniciar.ps1 -Limpar
+```
+
 ## O que o screen-tool faz
 
 **`analisar_tela`** — devolve o estado da tela combinando quatro fontes, cada uma

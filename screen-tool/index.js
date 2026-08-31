@@ -463,6 +463,62 @@ async function clicarElemento(args) {
   return `Controle: "${alvo.nome}" (id: ${alvo.id}, ${alvo.tipo}) em (${alvo.x},${alvo.y}).\n${resultado}`
 }
 
+// Sem isto toda automação é uma corrida: clica, e o passo seguinte acontece
+// antes da interface responder. Sondar pela árvore de acessibilidade custa
+// ~0,14s por ciclo contra ~2,6s do OCR, então quando a janela é conhecida a
+// espera vai pelo caminho rápido.
+async function esperar(args) {
+  const alvo = String(args?.texto ?? '').trim()
+  if (!alvo) return 'Erro: informe em `texto` o que esperar aparecer.'
+
+  const janela = String(args?.janela_esperada ?? '').trim()
+  const sumir = args?.sumir === true
+  const limite = Number.isFinite(args?.segundos)
+    ? Math.min(Math.max(Math.round(args.segundos), 1), 120)
+    : 15
+
+  const inicio = Date.now()
+  const viaControles = Boolean(janela)
+  let ciclos = 0
+  let ultimo = null
+
+  while ((Date.now() - inicio) / 1000 < limite) {
+    ciclos++
+    let presente = false
+    if (viaControles) {
+      const el = await lerElementos(janela)
+      if (el.erro) {
+        // A janela ainda pode estar abrindo: não é erro enquanto houver tempo.
+        ultimo = el.erro
+      } else {
+        presente = acharElemento(el.elementos ?? [], alvo).some((e) => e.habilitado)
+        ultimo = null
+      }
+    } else {
+      const dados = await inspecionar({ comVisao: false })
+      presente = acharTexto(dados, alvo).length > 0
+    }
+
+    if (presente !== sumir) {
+      const s = ((Date.now() - inicio) / 1000).toFixed(1)
+      return sumir
+        ? `"${alvo}" sumiu depois de ${s}s (${ciclos} verificações).`
+        : `"${alvo}" apareceu depois de ${s}s (${ciclos} verificações). Pode seguir.`
+    }
+  }
+
+  const s = ((Date.now() - inicio) / 1000).toFixed(1)
+  return [
+    `Desisti depois de ${s}s: "${alvo}" ${sumir ? 'continua na tela' : 'não apareceu'}.`,
+    ultimo ? `Última leitura: ${ultimo}` : '',
+    viaControles
+      ? 'Confira com analisar_tela {"controles": "<janela>"} o que existe de verdade.'
+      : 'Confira com analisar_tela o que está na tela.',
+  ]
+    .filter(Boolean)
+    .join('\n')
+}
+
 async function clicarEmTexto(args) {
   const procurado = String(args?.texto ?? '').trim()
   if (!procurado) return 'Erro: informe em `texto` o que deve ser clicado.'
@@ -607,12 +663,13 @@ function construirFerramentaAcao() {
         acao: {
           type: 'string',
           enum: [
-            'clicar_elemento', 'clicar_texto', 'focar',
+            'clicar_elemento', 'clicar_texto', 'esperar', 'focar',
             'mover', 'clicar', 'digitar', 'teclas', 'rolar',
           ],
           description:
             'clicar_elemento: clica um controle pelo nome ou id (use `texto` e `janela_esperada`). ' +
             'clicar_texto: acha o texto na tela e clica nele (use `texto`). ' +
+            'esperar: aguarda algo aparecer antes de seguir (use `texto`). ' +
             'focar: traz uma janela para frente (use `janela_esperada`).',
         },
         x: { type: 'integer', description: 'Coordenada X do alvo (mover, clicar, rolar).' },
@@ -639,6 +696,14 @@ function construirFerramentaAcao() {
             'Parte do título da janela. Obrigatório para clicar, digitar, teclas e focar. ' +
             'Em clicar_texto é opcional, e serve para desempatar quando o texto aparece em vários lugares.',
         },
+        segundos: {
+          type: 'integer',
+          description: 'Tempo máximo de espera, em segundos (ação esperar). Padrão 15.',
+        },
+        sumir: {
+          type: 'boolean',
+          description: 'Na ação esperar, aguardar o texto DESAPARECER em vez de aparecer.',
+        },
         simular: { type: 'boolean', description: 'Só dizer o que faria, sem fazer.' },
       },
       required: ['acao'],
@@ -652,6 +717,7 @@ function construirFerramentaAcao() {
     execute: (args) => {
       if (args?.acao === 'clicar_elemento') return clicarElemento(args)
       if (args?.acao === 'clicar_texto') return clicarEmTexto(args)
+      if (args?.acao === 'esperar') return esperar(args)
       return executarAcao(args)
     },
   }
