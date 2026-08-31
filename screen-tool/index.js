@@ -10,6 +10,7 @@ const execFileAsync = promisify(execFile)
 const AQUI = dirname(fileURLToPath(import.meta.url))
 const INSPECT_PS1 = join(AQUI, 'inspect.ps1')
 const ACT_PS1 = join(AQUI, 'act.ps1')
+const ELEMENTS_PS1 = join(AQUI, 'elements.ps1')
 const SAIDA_DIR = join(tmpdir(), 'dsh-screen-tool')
 
 // Largura da copia entregue ao modelo de visao. Custo em tokens de imagem,
@@ -258,6 +259,12 @@ function construirFerramenta(nomeFerramenta) {
             'Também pedir ao modelo visual uma leitura de layout e estado. ' +
             'Mais lento; o texto da tela já vem do OCR sem isso.',
         },
+        controles: {
+          type: 'string',
+          description:
+            'Título de uma janela: lista os controles clicáveis dela (nome, id e posição), ' +
+            'pela árvore de acessibilidade. Use antes de clicar_elemento, para saber o que existe.',
+        },
       },
       additionalProperties: false,
     },
@@ -276,6 +283,25 @@ function construirFerramenta(nomeFerramenta) {
         Number.isInteger(args?.monitor) && args.monitor >= 0
           ? args.monitor
           : null
+
+      const janelaControles =
+        typeof args?.controles === 'string' && args.controles.trim()
+          ? args.controles.trim()
+          : null
+      if (janelaControles) {
+        const el = await lerElementos(janelaControles)
+        if (el.erro) {
+          return `${el.erro}\nJanelas abertas: ${(el.janelas_abertas ?? []).join(' | ')}`
+        }
+        const lista = (el.elementos ?? [])
+          .filter((e) => e.habilitado)
+          .map((e) => `  "${e.nome}" (id: ${e.id}, ${e.tipo}) em (${e.x},${e.y})`)
+        return [
+          `CONTROLES de "${el.janela}" — ${lista.length} clicáveis`,
+          'Use a ação clicar_elemento com o nome ou, de preferência, o id.',
+          ...lista,
+        ].join('\n')
+      }
 
       const dados = await inspecionar({ comVisao })
       const grupos = agruparTexto(dados)
@@ -327,9 +353,16 @@ export function acharTexto(dados, procurado, filtroJanela) {
   const janela = filtroJanela ? normalizar(filtroJanela) : null
   const achados = []
 
+  // Busca curta exige igualdade, não "contém". Medido na Calculadora: procurar
+  // "+" casava com "tvl+" — o botão de MEMÓRIA que o OCR leu errado — e o
+  // clique iria para o controle errado sem nenhum aviso. Para um ou dois
+  // caracteres, "contém" acerta por acidente com frequência demais.
+  const exigeExato = alvo.length <= 2
+
   for (const bloco of dados.ocr) {
     for (const linha of bloco.linhas) {
-      if (!normalizar(linha.texto).includes(alvo)) continue
+      const texto = normalizar(linha.texto)
+      if (exigeExato ? texto !== alvo : !texto.includes(alvo)) continue
       const j = janelaDaLinha(linha, dados.janelas)
       if (janela && !normalizar(j?.titulo).includes(janela)) continue
       achados.push({
@@ -342,6 +375,92 @@ export function acharTexto(dados, procurado, filtroJanela) {
     }
   }
   return achados
+}
+
+// A árvore de acessibilidade do Windows. É melhor que o OCR onde mais importa:
+// botão de símbolo. Na Calculadora, procurar "+" por OCR casava com "tvl+" — o
+// botão de MEMÓRIA mal lido — e "=" não era encontrado. Aqui vêm "Mais" e
+// "Igual a", com retângulo exato.
+async function lerElementos(janela) {
+  const saida = join(SAIDA_DIR, 'elementos.json')
+  await mkdir(SAIDA_DIR, { recursive: true })
+  const args = [
+    '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass',
+    '-File', ELEMENTS_PS1, '-Janela', janela, '-Out', saida,
+  ]
+  try {
+    await execFileAsync('powershell.exe', args, {
+      windowsHide: true,
+      timeout: 60_000,
+      maxBuffer: 4 * 1024 * 1024,
+    })
+  } catch {
+    // O script sai com código 1 quando não acha a janela, mas grava o motivo.
+  }
+  const dados = JSON.parse(await readFile(saida, 'utf8'))
+  if (Array.isArray(dados.elementos)) return dados
+  if (dados.elementos) return { ...dados, elementos: [dados.elementos] }
+  return dados
+}
+
+// Casa por AutomationId exato primeiro: é o identificador estável, e não muda
+// com o idioma do Windows. Só depois tenta o nome visível.
+export function acharElemento(elementos, procurado) {
+  const alvo = normalizar(procurado)
+  const porId = elementos.filter((e) => normalizar(e.id) === alvo)
+  if (porId.length) return porId
+  const nomeExato = elementos.filter((e) => normalizar(e.nome) === alvo)
+  if (nomeExato.length) return nomeExato
+  return elementos.filter(
+    (e) => normalizar(e.nome).includes(alvo) || normalizar(e.id).includes(alvo),
+  )
+}
+
+async function clicarElemento(args) {
+  const procurado = String(args?.texto ?? '').trim()
+  const janela = String(args?.janela_esperada ?? '').trim()
+  if (!procurado) return 'Erro: informe em `texto` o nome ou o id do controle.'
+  if (!janela) return 'Erro: informe em `janela_esperada` a janela onde procurar o controle.'
+
+  const dados = await lerElementos(janela)
+  if (dados.erro) {
+    return `${dados.erro}\nJanelas abertas: ${(dados.janelas_abertas ?? []).join(' | ')}`
+  }
+
+  const todos = dados.elementos ?? []
+  const achados = acharElemento(todos, procurado).filter((e) => e.habilitado)
+
+  if (achados.length === 0) {
+    const amostra = todos
+      .filter((e) => e.habilitado && e.nome)
+      .slice(0, 20)
+      .map((e) => `  "${e.nome}"${e.id ? ` (id: ${e.id})` : ''}`)
+    return [
+      `Não há controle "${procurado}" em "${dados.janela}". Nada foi clicado.`,
+      'Controles disponíveis:',
+      ...amostra,
+    ].join('\n')
+  }
+
+  if (achados.length > 1) {
+    return [
+      `"${procurado}" casa com ${achados.length} controles. NÃO cliquei.`,
+      ...achados.slice(0, 10).map((e) => `  "${e.nome}" (id: ${e.id}) em (${e.x},${e.y})`),
+      'Repita usando o id, que é exato.',
+    ].join('\n')
+  }
+
+  const alvo = achados[0]
+  const resultado = await executarAcao({
+    acao: 'clicar',
+    x: alvo.x,
+    y: alvo.y,
+    botao: args?.botao,
+    duplo: args?.duplo,
+    simular: args?.simular,
+    janela_esperada: janela,
+  })
+  return `Controle: "${alvo.nome}" (id: ${alvo.id}, ${alvo.tipo}) em (${alvo.x},${alvo.y}).\n${resultado}`
 }
 
 async function clicarEmTexto(args) {
@@ -476,18 +595,23 @@ function construirFerramentaAcao() {
   return {
     name: 'interagir_tela',
     description:
-      'Age na tela. Prefira "clicar_texto" (acha o texto e clica nele) a calcular ' +
-      'coordenada: é mais confiável e dispensa ler o mapa da tela. Use "focar" para trazer ' +
-      'uma janela para frente antes de digitar nela. Para "clicar", "digitar" e "teclas" é ' +
-      'obrigatório informar janela_esperada; sem isso a chamada apenas simula e informa o ' +
-      'que encontrou no alvo.',
+      'Age na tela. Ordem de preferência: "clicar_elemento" (usa a árvore de acessibilidade ' +
+      'do Windows — é a mais confiável, e a única que acerta botão de símbolo como + ou =), ' +
+      'depois "clicar_texto" (acha o texto na tela), e só então coordenada crua. ' +
+      'Use "focar" para trazer uma janela para frente antes de digitar nela. Para "clicar", ' +
+      '"digitar" e "teclas" é obrigatório informar janela_esperada; sem isso a chamada ' +
+      'apenas simula e informa o que encontrou no alvo.',
     parameters: {
       type: 'object',
       properties: {
         acao: {
           type: 'string',
-          enum: ['clicar_texto', 'focar', 'mover', 'clicar', 'digitar', 'teclas', 'rolar'],
+          enum: [
+            'clicar_elemento', 'clicar_texto', 'focar',
+            'mover', 'clicar', 'digitar', 'teclas', 'rolar',
+          ],
           description:
+            'clicar_elemento: clica um controle pelo nome ou id (use `texto` e `janela_esperada`). ' +
             'clicar_texto: acha o texto na tela e clica nele (use `texto`). ' +
             'focar: traz uma janela para frente (use `janela_esperada`).',
         },
@@ -495,7 +619,9 @@ function construirFerramentaAcao() {
         y: { type: 'integer', description: 'Coordenada Y do alvo (mover, clicar, rolar).' },
         texto: {
           type: 'string',
-          description: 'O que digitar (ação digitar), ou o que procurar e clicar (ação clicar_texto).',
+          description:
+            'O que digitar (digitar), o texto a procurar na tela (clicar_texto), ' +
+            'ou o nome/id do controle (clicar_elemento).',
         },
         teclas: {
           type: 'string',
@@ -523,8 +649,11 @@ function construirFerramentaAcao() {
       render: (_args, value) => [{ type: 'text', text: value }],
     },
     timeoutMs: 120_000,
-    execute: (args) =>
-      args?.acao === 'clicar_texto' ? clicarEmTexto(args) : executarAcao(args),
+    execute: (args) => {
+      if (args?.acao === 'clicar_elemento') return clicarElemento(args)
+      if (args?.acao === 'clicar_texto') return clicarEmTexto(args)
+      return executarAcao(args)
+    },
   }
 }
 

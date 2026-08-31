@@ -104,6 +104,34 @@ Verificado com o modelo local encadeando as duas sozinho (focar o GitHub Desktop
 e clicar em History), com o resultado **conferido por leitura independente da
 tela**, e não pelo relato do agente.
 
+**Quarta fonte de percepção, e a mais importante para automação: a árvore de
+acessibilidade** (`elements.ps1`, UI Automation). Testar contra a Calculadora
+mostrou que clicar por OCR tem um modo de falha perigoso, não apenas impreciso:
+
+- procurar `"+"` casou com **`tvl+`** — o botão de **memória** que o OCR leu
+  errado. O clique iria para o controle errado **sem aviso nenhum**.
+- procurar `"="` não achou nada: OCR não lê botão de símbolo.
+- pela UIA: `nome=[Mais] id=[plusButton]`, `nome=[Igual a] id=[equalButton]`,
+  com retângulo exato, em ~140ms.
+
+Duas correções saíram daí: a ação `clicar_elemento` (prefira sempre o
+`AutomationId`, que não muda com o idioma) e, no `clicar_texto`, **busca de um
+ou dois caracteres passou a exigir igualdade** em vez de "contém".
+
+Validado ponta a ponta: `7 + 8 =` na Calculadora, com o **15 conferido lendo a
+tela depois**.
+
+## Inicializador
+
+`iniciar.ps1` + ícone na Área de Trabalho (`instalar-atalho.ps1`, roda uma vez).
+Confere o Ollama e sobe se preciso — com `OLLAMA_MODELS=E:\Ollama`, senão ele não
+acha modelo nenhum —, lê o modelo padrão do `settings.yaml`, aquece (a primeira
+chamada fria custa ~4s) e abre a interface. Cada passo falha com mensagem útil.
+
+Detalhe que só apareceu testando: sem conferir a porta antes, uma instância já
+rodando fazia o boot morrer com **30 linhas de stack trace do Node**, com o
+`EADDRINUSE` enterrado no meio. Agora avisa em uma linha e sugere outra porta.
+
 Isso muda a categoria do plugin: **observar é reversível, agir não é.** Daí as
 três travas, descritas em `screen-tool/README.txt`:
 

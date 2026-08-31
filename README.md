@@ -20,18 +20,36 @@ consciência do que está na tela — e, agora, capacidade de agir sobre ela.
 | `modelfiles/` | Modelfiles dos modelos derivados, com contexto corrigido |
 | `.dsh/` | Configuração do dsh: `settings.yaml`, profiles `web` e `headless`, preset `enxuto` |
 
+## Começando
+
+Rode uma vez para criar o atalho na Área de Trabalho:
+
+```bash
+powershell -ExecutionPolicy Bypass -File instalar-atalho.ps1
+```
+
+Depois é só o ícone. Ele confere o Ollama (e sobe, se preciso), confere o modelo
+padrão, aquece o modelo e abre a interface — parando com uma mensagem útil se
+algum passo falhar, em vez de abrir algo quebrado.
+
 ## O que o screen-tool faz
 
-**`analisar_tela`** — devolve o estado da tela combinando três fontes, cada uma
+**`analisar_tela`** — devolve o estado da tela combinando quatro fontes, cada uma
 escolhida por ser a mais exata para o que entrega:
 
 - **monitores**: todos, não só o principal
 - **janelas**: título, processo, retângulo, ordem-Z e foco, direto do Win32
 - **texto**: OCR nativo do Windows, com a coordenada de cada linha, atribuído por
   geometria à janela que o contém
+- **controles** (`{"controles":"Calculadora"}`): nome, id e retângulo de cada
+  elemento clicável, pela árvore de acessibilidade
 
-**`interagir_tela`** — move o mouse, clica, digita, envia combinações e rola,
-consumindo as **mesmas coordenadas** que a percepção devolve.
+**`interagir_tela`** — move o mouse, clica, digita, envia combinações, rola e traz
+janelas para frente, consumindo as **mesmas coordenadas** que a percepção devolve.
+
+Para automatizar, a ordem de preferência é `clicar_elemento` → `clicar_texto` →
+coordenada crua. A primeira é a única que acerta botão de símbolo: procurar `+`
+por OCR na Calculadora casava com o botão de **memória** mal lido.
 
 Detalhes, medições e limites em [`screen-tool/README.txt`](screen-tool/README.txt).
 

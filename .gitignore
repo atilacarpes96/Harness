@@ -20,3 +20,6 @@ screenshot-tool.png
 
 # payloads brutos capturados pelo proxy-log (grandes, regeneráveis)
 harness-bench/results/requests.jsonl
+
+# icone gerado pelo instalar-atalho.ps1
+dsharness.ico

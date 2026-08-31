@@ -95,10 +95,32 @@ CAMADA DE CONTROLE — interagir_tela (act.ps1)
 Move o mouse, clica, digita, envia combinações e rola. Consome as MESMAS
 coordenadas que o analisar_tela devolve, sem conversão no meio.
 
-Preferidas, por serem as que não exigem calcular coordenada:
+Ordem de preferência — de cima para baixo, da mais confiável para a menos:
 
+  interagir_tela {"acao":"clicar_elemento","texto":"plusButton","janela_esperada":"Calculadora"}
   interagir_tela {"acao":"clicar_texto","texto":"Salvar"}
   interagir_tela {"acao":"focar","janela_esperada":"Bloco de notas"}
+
+CLICAR POR CONTROLE (o melhor caminho)
+
+`clicar_elemento` usa a árvore de acessibilidade do Windows (UI Automation),
+não pixel. Descubra o que existe com:
+
+  analisar_tela {"controles":"Calculadora"}
+
+Por que isto importa, medido na Calculadora em 31/08:
+
+  procurar "+"  por OCR  -> casou com "tvl+", que era o botão de MEMÓRIA lido
+                            errado. O clique iria para o controle errado sem
+                            aviso nenhum.
+  procurar "="  por OCR  -> não achou nada.
+  pela UIA               -> nome=[Mais] id=[plusButton], nome=[Igual a]
+                            id=[equalButton], com retângulo exato.
+
+Prefira sempre o `id` (AutomationId) ao nome: ele é estável entre idiomas do
+Windows, enquanto o nome muda ("Mais" / "Plus").
+
+Custo: ~90ms para achar a janela, ~50ms para varrer os controles.
 
 Primitivas, para quando não há texto no alvo:
 
@@ -117,6 +139,8 @@ Salvar" é garantia mais forte que um título de janela.
 
 A comparação é tolerante a acento e caixa, porque o OCR troca os dois com
 frequência e exigir igualdade exata faria a automação falhar por um ç mal lido.
+Mas busca de UM ou DOIS caracteres exige igualdade: com texto curto, "contém"
+acerta por acidente demais — foi assim que "+" casou dentro de "tvl+".
 
 O que ela NÃO faz é escolher por você:
 

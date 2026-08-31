@@ -13,6 +13,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import {
+  acharElemento,
   acharTexto,
   agruparTexto,
   formatar,
@@ -321,6 +322,52 @@ test('acharTexto restringe por janela para desempatar', () => {
   const so = acharTexto(dados, 'fechar', 'Navegador')
   assert.equal(so.length, 1)
   assert.ok(so[0].x < 0, 'sobrou a do monitor da esquerda')
+})
+
+// -- controles pela árvore de acessibilidade ---------------------------------
+// Estes números vêm da Calculadora real, medidos em 31/08. É o caso que provou
+// por que o OCR não basta: procurar "+" por OCR casava com "tvl+", que era o
+// botão de MEMÓRIA lido errado.
+const BOTOES_CALCULADORA = [
+  { nome: 'Adição de memória', id: 'MemPlus', tipo: 'Button', x: 1707, y: 910, habilitado: true },
+  { nome: 'Mais', id: 'plusButton', tipo: 'Button', x: 1852, y: 1164, habilitado: true },
+  { nome: 'Igual a', id: 'equalButton', tipo: 'Button', x: 1852, y: 1218, habilitado: true },
+  { nome: 'Sete', id: 'num7Button', tipo: 'Button', x: 1616, y: 1058, habilitado: true },
+  { nome: 'Limpar', id: 'clearButton', tipo: 'Button', x: 1774, y: 952, habilitado: true },
+  { nome: 'Limpar entrada', id: 'clearEntryButton', tipo: 'Button', x: 1695, y: 952, habilitado: true },
+]
+
+test('acharElemento prefere o id exato, que não muda com o idioma', () => {
+  const r = acharElemento(BOTOES_CALCULADORA, 'plusButton')
+  assert.equal(r.length, 1)
+  assert.equal(r[0].nome, 'Mais')
+})
+
+test('acharElemento acha o botão certo pelo nome, e não o de memória', () => {
+  const r = acharElemento(BOTOES_CALCULADORA, 'Mais')
+  assert.equal(r.length, 1, 'nome exato ganha de "Adição de memória", que apenas contém a palavra')
+  assert.equal(r[0].id, 'plusButton')
+})
+
+test('acharElemento devolve os empates em vez de escolher', () => {
+  // "Limpar" casa exato com um e por prefixo com outro: o exato deve ganhar.
+  assert.deepEqual(acharElemento(BOTOES_CALCULADORA, 'Limpar').map((e) => e.id), ['clearButton'])
+  // Já um trecho ambíguo tem que devolver os dois, para quem chama recusar.
+  assert.equal(acharElemento(BOTOES_CALCULADORA, 'clear').length, 2)
+})
+
+test('acharTexto exige igualdade em busca de 1 ou 2 caracteres', () => {
+  // O caso real: "+" não pode casar dentro de "tvl+" e mandar o clique para a
+  // memória. Com texto curto, "contém" acerta por acidente com frequência.
+  const dados = {
+    janelas: DUAS_TELAS.janelas,
+    ocr: [{ monitor: 0, linhas: [
+      { texto: 'tvl+', x: 200, y: 100, w: 40, h: 18 },
+      { texto: 'Salvar tudo', x: 200, y: 200, w: 90, h: 18 },
+    ] }],
+  }
+  assert.equal(acharTexto(dados, '+').length, 0, 'não pode casar dentro de tvl+')
+  assert.equal(acharTexto(dados, 'Salvar').length, 1, 'busca longa continua por trecho')
 })
 
 test('focar não é forçado a simular, mas leva a janela alvo', () => {
