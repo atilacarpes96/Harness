@@ -1,16 +1,95 @@
-DSH Screen Analyzer
+DSH Screen Analyzer — camada de percepção de tela
 
-Tool: analisar_tela
-Captura: E:\DSHARNESS\screenshot-tool.png
-Modelo visual: qwen3.5:4b
+Ferramentas registradas: analisar_tela (apelido: ver_tela)
 
-Instalação:
-1. Extraia a pasta screen-tool para E:\DSHARNESS\screen-tool
-2. Feche o Harness.
-3. Rode:
-   cd E:\DSHARNESS
-   dsh plugin --profile web add .\screen-tool
-4. Verifique:
-   dsh --profile web --dump-config | Select-String "screen-analyzer|dsh-screen-analyzer"
-5. Inicie:
-   ollama launch dsh --model qwen3-agent:8b
+
+O QUE FAZ
+
+Devolve o estado da tela em três fontes, cada uma escolhida por ser a mais
+exata para o que entrega:
+
+  1. Monitores  — System.Windows.Forms.Screen, TODOS os monitores
+  2. Janelas    — user32/dwmapi: título, processo, retângulo, ordem-Z, foco
+  3. Texto      — Windows.Media.Ocr, com a coordenada de cada linha
+
+O texto do OCR é atribuído por geometria à janela que o contém, então o
+resultado não é uma lista solta de strings: é "dentro da janela X, na
+coordenada Y, este texto". Todas as coordenadas são da área de trabalho
+virtual, prontas para uso direto — inclusive negativas, quando há um monitor
+à esquerda do principal.
+
+O modelo visual (qwen3.5:4b) entra só se `visao: true` for pedido, e apenas
+para julgar layout e estado. Ele é proibido de transcrever texto.
+
+
+POR QUE ASSIM, E NÃO "DESCREVA A IMAGEM"
+
+A versão anterior capturava só `PrimaryScreen` — em duas telas, metade da
+informação nunca era capturada — e mandava a tela inteira para um modelo de 4B
+dentro de num_ctx 4096. Medições que motivaram a reescrita (31/08/2026):
+
+  custo da imagem em tokens, qwen3.5:4b
+    512x288    164        1280x720    940
+    768x432    356        1920x1080  2060
+    1024x576   596        2560x1440  3620   <- uma tela
+
+  A 2560x1440 sobravam ~245 tokens de contexto para a resposta. O modelo
+  devolvia ~90 tokens de descrição vaga e soletrava texto errado. Com duas
+  telas (5120x1440, ~7240 tokens) a imagem sozinha não caberia no contexto.
+
+O OCR nativo do Windows resolve o mesmo problema melhor e mais barato:
+105 linhas com coordenada em 0,7s, contra uma frase vaga em 6s. Ampliar 2x
+antes de reconhecer sobe para ~127 linhas (texto de interface tem ~9px).
+
+
+USO
+
+  analisar_tela                          tudo, de todos os monitores
+  analisar_tela {"monitor": 1}           só o segundo monitor
+  analisar_tela {"visao": true}          soma a leitura de layout do modelo
+  analisar_tela {"pergunta": "..."}      orienta a leitura visual
+
+Custo do resultado: ~1.7k tokens numa tela de 2560x1440 com 125 linhas de
+texto. Cabe folgado no dsh-4b:16k depois do prompt de sistema enxuto.
+
+As capturas ficam em %TEMP%\dsh-screen-tool (o caminho sai no resultado).
+
+
+TESTES
+
+  node --test screen-tool/test.mjs
+
+Cobrem a geometria com duas telas sintéticas, incluindo a segunda em X
+negativo — o arranjo mais comum e o que quebra código que assume coordenada
+não-negativa.
+
+Para exercitar a captura multi-monitor de verdade com uma tela só, o
+inspect.ps1 tem o gancho -SimularMonitores, que recebe o caminho de um json
+com retângulos e trata regiões da tela física como monitores separados:
+
+  echo [{"x":0,"y":0,"largura":1280,"altura":1440},{"x":1280,"y":0,"largura":1280,"altura":1440}] > dual.json
+  powershell -File screen-tool\inspect.ps1 -OutDir saida -Ocr -SimularMonitores dual.json
+
+Verificar na saída: dois monitor-N.png, e as coordenadas do OCR do monitor 1
+começando em 1280 (o deslocamento aplicado).
+
+
+INSTALAÇÃO
+
+O plugin já está ligado nos dois profiles por link:, não por file: — editar o
+fonte tem efeito imediato, sem reinstalar. Conferir com:
+
+  ls .dsh/profiles/web/node_modules/dsh-screen-analyzer     (deve ser symlink)
+
+Para instalar em um profile novo:
+
+  dsh plugin --profile <nome> add link:E:/DSHARNESS/screen-tool
+
+
+LIMITES CONHECIDOS
+
+- Só observa. Não move o mouse, não clica, não digita.
+- Não lê conteúdo de janela minimizada (o Windows não a desenha).
+- Janela que cruza dois monitores é atribuída àquele onde tem mais área.
+- O OCR erra em fonte muito pequena ou com pouco contraste; a coordenada
+  continua correta mesmo quando o texto sai imperfeito.

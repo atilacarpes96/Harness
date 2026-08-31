@@ -12,7 +12,7 @@ Existe um documento de handoff antigo descrevendo uma ferramenta de análise de 
 - `.dsh/profiles/web/` — profile da interface web (`dsh web`, porta 3080)
 - `.dsh/profiles/headless/` — profile sem UI, criado pra testar via terminal: `dsh --profile headless "sua pergunta"`. O corte de ferramentas mora em `cordis.patch.yml` e vale por padrão (ver achados)
 - `dsh-safe-developer/` — plugin com a tool `validar_plugin_local` (valida hash/versão/dependência de outro plugin antes de confiar nele)
-- `screen-tool/` — plugin com a tool `analisar_tela` (+ o apelido `ver_tela`)
+- `screen-tool/` — plugin com a tool `analisar_tela` (+ o apelido `ver_tela`). `inspect.ps1` é a camada de percepção (monitores/janelas/OCR numa só chamada), `index.js` monta o resultado, `test.mjs` cobre a geometria de duas telas — `node --test screen-tool/test.mjs`
 - `.dsh/.agent-presets/enxuto/` — preset do agente usado pelo profile `web`: shell, arquivos e os plugins locais, sem subagente/workflow/goal/todo/skill/plano/busca-web
 - `harness-bench/` — ferramentas próprias: `compare.mjs` (compara modelos Ollama direto, sem o overhead do agente) e `proxy-log.mjs` (proxy entre o dsh e o Ollama que grava o payload real de cada chamada — é como o overhead foi medido)
 - `modelfiles/` — Modelfiles dos modelos derivados com contexto corrigido (ver abaixo)
@@ -54,10 +54,33 @@ dropdown, mas rodam com contexto 4096 — só usar pra comparação.
 1. ~~**Overhead de prompt de sistema**~~ — **medido e atacado em 31/08.** Eram 8.710 tokens por chamada, dos quais 87% eram só os schemas das 32 ferramentas. Medição completa em `harness-bench/results/overhead-2026-08-31.md`. Duas correções aplicadas: contexto de verdade (modelos `dsh-4b:16k` / `dsh-8b:12k`) e o overlay `harness-bench/patches/enxuto.yml`, que desliga 18 ferramentas e leva o prompt a 3.507 tokens (−60%). No profile `web` a mesma coisa foi feita como *agent preset* — `.dsh/.agent-presets/enxuto/`, já definido como padrão em `settings.yaml`. Medido pela UI: **8,6 K -> 3,8 K tokens** por chamada. As ferramentas dos plugins locais sobrevivem ao preset (vêm do plano do host, não do preset).
 
    **Correção posterior (2ª sessão):** aquele "duas correções" só valia inteiro no `web`. O headless dependia de passar `--patch` na mão e ninguém passava — medido pelo proxy: **28 ferramentas / 8.282 tokens** sem o overlay contra **10 / 3.082** com ele. A lista foi movida pra `.dsh/profiles/headless/cordis.patch.yml` e agora vale por padrão (verificado: sem `--patch`, 10 ferramentas / 3.082 tokens). O `harness-bench/patches/enxuto.yml` virou array vazio pra não manter a lista em dois lugares — a original está em `git show 22d6c38:harness-bench/patches/enxuto.yml`.
-2. **Análise visual detalhada**: nenhum modelo local testado (4B ou 8B) foi bom o suficiente pra decompor uma cena complexa com várias janelas/monitores — isso é relevante se algum dia for atacar a parte de análise de planta/PPCI de verdade. Provavelmente vai exigir pipeline (recortar regiões, várias passadas, OCR pra texto) em vez de "descreva a imagem inteira".
+2. ~~**Análise visual detalhada**~~ — **atacada na 2ª sessão, e o diagnóstico estava errado.** Não era o modelo ser pequeno: era a ferramenta não entregar a informação. Dois defeitos somados:
+
+   - `capturePrimaryScreen()` usava `[Screen]::PrimaryScreen` — **com duas telas, metade nunca era capturada.**
+   - A tela inteira ia para o modelo dentro de `num_ctx 4096`. Uma imagem 2560x1440 custa **3.620 tokens** (medido: 1024px=596, 1280px=940, 1920px=2060), então sobravam ~245 tokens para a resposta. Com duas telas (5120x1440, ~7240 tokens) a imagem sozinha não caberia. É o mesmo erro de contexto pequeno da pendência 1, num terceiro lugar.
+
+   A saída foi parar de pedir ao modelo o que o Windows entrega exato. A ferramenta agora combina três fontes: monitores (`Screen.AllScreens`, todos), janelas (`user32`/`dwmapi`: título, processo, retângulo, ordem-Z, foco) e texto (`Windows.Media.Ocr`, **nativo, pt-BR e en-US, ~0,7s por tela**), com o texto atribuído por geometria à janela que o contém. O modelo visual virou opcional (`visao: true`) e só julga layout — proibido de transcrever, porque inventava texto que não existia.
+
+   Antes: ~90 tokens de prosa vaga, uma tela, sem coordenada. Depois: **125 linhas de texto com coordenada, agrupadas por janela, em 2,6s**, custando ~1,7k tokens de resultado. Ver `screen-tool/README.txt`.
 3. ~~**Idioma**~~ — **reavaliado e fechado.** A suspeita estava certa: era o truncamento. Com `dsh-4b:16k` e contexto de verdade, 4 de 4 perguntas em português (incluindo uma aberta, sem chamada de ferramenta) vieram respondidas em português, sem precisar pedir. Não vale mais tratar como pendência; se voltar a acontecer, suspeitar de contexto estourado antes de culpar o modelo.
 4. **`dsh` está em versão alpha** (`0.1.2-alpha.2`) — é software em desenvolvimento ativo, esperar mais bugs/comportamento estranho ocasional.
 5. ~~**Os 6 apelidos do `analisar_tela`**~~ — cortados pra 2 (`analisar_tela`, `ver_tela`) em 31/08. Com o contexto corrigido o modelo acerta o nome literal.
+
+## Direção declarada pelo usuário (31/08, 2ª sessão)
+
+O `screen-tool` não é um experimento de visão: é o começo de um **assistente que
+acompanha o trabalho do dia a dia** — saber o que está acontecendo na tela e dar
+contexto melhor. E, mais adiante, **agir**: mexer no mouse e no teclado,
+interagir com a tela como uma pessoa quando não der para resolver por comando.
+
+Isso já decidiu uma escolha de arquitetura: a camada de percepção devolve
+**coordenada de tela em tudo** — janela, linha de texto, área — em vez de só
+prosa. Uma descrição não é clicável; um retângulo é. Quem for construir a camada
+de controle não precisa refazer a percepção, só consumir o que já sai de lá.
+
+Ainda **não existe** nenhuma capacidade de entrada (mouse/teclado), e a
+ferramenta declara isso na própria descrição. Quando for construída, vale tratar
+como mudança de categoria: hoje o plugin só observa, e observar é reversível.
 
 ## Git
 
