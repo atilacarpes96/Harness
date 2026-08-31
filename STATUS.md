@@ -1,4 +1,4 @@
-# DSHARNESS — Status (última atualização: 31/08/2026)
+# DSHARNESS — Status (última atualização: 31/08/2026, 2ª sessão)
 
 ## O que é este projeto, de verdade
 
@@ -10,7 +10,7 @@ Existe um documento de handoff antigo descrevendo uma ferramenta de análise de 
 
 - `.dsh/settings.yaml` — configuração dos modelos (o arquivo mais importante; recarrega sozinho, não precisa reiniciar nada quando editado)
 - `.dsh/profiles/web/` — profile da interface web (`dsh web`, porta 3080)
-- `.dsh/profiles/headless/` — profile sem UI, criado pra testar via terminal: `dsh --profile headless "sua pergunta"`
+- `.dsh/profiles/headless/` — profile sem UI, criado pra testar via terminal: `dsh --profile headless "sua pergunta"`. O corte de ferramentas mora em `cordis.patch.yml` e vale por padrão (ver achados)
 - `dsh-safe-developer/` — plugin com a tool `validar_plugin_local` (valida hash/versão/dependência de outro plugin antes de confiar nele)
 - `screen-tool/` — plugin com a tool `analisar_tela` (+ o apelido `ver_tela`)
 - `.dsh/.agent-presets/enxuto/` — preset do agente usado pelo profile `web`: shell, arquivos e os plugins locais, sem subagente/workflow/goal/todo/skill/plano/busca-web
@@ -44,17 +44,23 @@ dropdown, mas rodam com contexto 4096 — só usar pra comparação.
 - Pra ver o que o dsh manda de verdade: `node harness-bench/proxy-log.mjs` e apontar `baseURL` pra `http://127.0.0.1:11435/v1`. Lembrar de voltar pra 11434 depois.
 - **Plugin declarado como `file:` no `package.json` do profile é COPIADO pelo pnpm, não linkado** — editar o fonte não muda nada até reinstalar. Foi o que aconteceu com o `screen-tool` no profile `web`, que ficou 4 dias atrás da fonte sem ninguém notar. Os dois profiles usam `link:` agora; ao mexer em plugin, conferir com `ls -la .dsh/profiles/<profile>/node_modules/` que é symlink.
 - Ferramenta registrada por bundle do profile (plano do host) chega no agente **independente do preset** — por isso o preset `enxuto` não precisa declarar `analisar_tela`/`validar_plugin_local`.
+- **`agent-presets: default:` no `settings.yaml` NÃO alcança o profile headless.** Agent preset é conceito do app web (ele monta a sessão do agente a partir de um preset); o launcher não tem `--preset`. Consequência: entre 31/08 e a 2ª sessão, o `web` rodava enxuto e o headless rodava com as 28 ferramentas — todo teste feito por terminal media a configuração errada, sem nenhum sinal disso na saída. Corrigido movendo o corte pra `.dsh/profiles/headless/cordis.patch.yml`, que é a camada do próprio profile e vale sem `--patch`. Lição geral: **as duas mecânicas de corte são independentes; mexer numa não afeta a outra, e nada avisa.**
+- Pra conferir de verdade quantas ferramentas um profile manda, não confie no `--dump-config` (a saída é grande e fácil de ler errado) — suba o `proxy-log.mjs` e olhe `toolCount`/`prompt_tokens` do payload real.
 - Pra rodar uma segunda instância web de teste sem derrubar a que está aberta: `dsh web --port 3081 --no-open` (o token de acesso sai no log).
 - O Ollama do usuário guarda os modelos em `E:\Ollama` — se subir o serve na mão, precisa de `OLLAMA_MODELS='E:\Ollama'`, senão ele acha que não tem modelo nenhum.
 
 ## Pendências / não resolvido
 
 1. ~~**Overhead de prompt de sistema**~~ — **medido e atacado em 31/08.** Eram 8.710 tokens por chamada, dos quais 87% eram só os schemas das 32 ferramentas. Medição completa em `harness-bench/results/overhead-2026-08-31.md`. Duas correções aplicadas: contexto de verdade (modelos `dsh-4b:16k` / `dsh-8b:12k`) e o overlay `harness-bench/patches/enxuto.yml`, que desliga 18 ferramentas e leva o prompt a 3.507 tokens (−60%). No profile `web` a mesma coisa foi feita como *agent preset* — `.dsh/.agent-presets/enxuto/`, já definido como padrão em `settings.yaml`. Medido pela UI: **8,6 K -> 3,8 K tokens** por chamada. As ferramentas dos plugins locais sobrevivem ao preset (vêm do plano do host, não do preset).
+
+   **Correção posterior (2ª sessão):** aquele "duas correções" só valia inteiro no `web`. O headless dependia de passar `--patch` na mão e ninguém passava — medido pelo proxy: **28 ferramentas / 8.282 tokens** sem o overlay contra **10 / 3.082** com ele. A lista foi movida pra `.dsh/profiles/headless/cordis.patch.yml` e agora vale por padrão (verificado: sem `--patch`, 10 ferramentas / 3.082 tokens). O `harness-bench/patches/enxuto.yml` virou array vazio pra não manter a lista em dois lugares — a original está em `git show 22d6c38:harness-bench/patches/enxuto.yml`.
 2. **Análise visual detalhada**: nenhum modelo local testado (4B ou 8B) foi bom o suficiente pra decompor uma cena complexa com várias janelas/monitores — isso é relevante se algum dia for atacar a parte de análise de planta/PPCI de verdade. Provavelmente vai exigir pipeline (recortar regiões, várias passadas, OCR pra texto) em vez de "descreva a imagem inteira".
-3. **Idioma**: modelos menores às vezes respondem em inglês mesmo com pergunta em português — pedir explicitamente "responda em português" resolve na hora, mas não é automático. (Parte disso pode ter sido o truncamento do prompt; vale reavaliar agora que o contexto está correto.)
+3. ~~**Idioma**~~ — **reavaliado e fechado.** A suspeita estava certa: era o truncamento. Com `dsh-4b:16k` e contexto de verdade, 4 de 4 perguntas em português (incluindo uma aberta, sem chamada de ferramenta) vieram respondidas em português, sem precisar pedir. Não vale mais tratar como pendência; se voltar a acontecer, suspeitar de contexto estourado antes de culpar o modelo.
 4. **`dsh` está em versão alpha** (`0.1.2-alpha.2`) — é software em desenvolvimento ativo, esperar mais bugs/comportamento estranho ocasional.
 5. ~~**Os 6 apelidos do `analisar_tela`**~~ — cortados pra 2 (`analisar_tela`, `ver_tela`) em 31/08. Com o contexto corrigido o modelo acerta o nome literal.
 
 ## Git
 
 Repositório foi inicializado em 30/08 (não existia antes). Histórico limpo, `.gitignore` protegendo credenciais e sessões. `git log --oneline` pra ver o histórico completo do que foi feito.
+
+**Nada de arquivo `.backup`/`.bak` daqui pra frente.** Os 24 que existiam (de 26–27/08, anteriores ao git) foram apagados na 2ª sessão — inclusive 6 versões seriadas do `screen-tool/index.js` e 4 do `package.json` do profile web. Eram o hábito de versionar à mão de antes do repo existir; hoje só escondem qual arquivo é o vivo. Todos entraram no snapshot inicial antes de sair, então continuam recuperáveis: `git show 3cf2cdd:screen-tool/index.js.before-qwen3.5.backup`. Pra guardar um estado antes de mexer, usar `git stash`, um branch, ou simplesmente commitar.

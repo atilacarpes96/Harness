@@ -1,4 +1,58 @@
-# Your patch layer for this dsh profile, applied after every bundle layer:
-# a top-level YAML array of loader patch entries (id-targeted config
-# overrides, disables, and insert lists; `!!js` expressions allowed).
-[]
+# Camada de patch do profile headless, aplicada depois de cada bundle.
+#
+# Conteúdo: o corte de ferramentas "enxuto" — o equivalente headless do agent
+# preset `.dsh/.agent-presets/enxuto/`, que o profile `web` recebe via
+# `agent-presets: default: enxuto` no settings.yaml.
+#
+# Por que aqui e não lá: `agent-presets` é conceito do app web (ele monta a
+# sessão do agente a partir de um preset). O launcher não tem `--preset`, então
+# no headless o mesmo corte só existe se estiver nesta camada — ou passado à mão
+# com `--patch`, que era o estado até 31/08 e ninguém lembrava de fazer.
+#
+# Medido pelo proxy (harness-bench/proxy-log.mjs), pergunta trivial no dsh-4b:16k:
+#   sem este corte: 28 ferramentas, 8.282 prompt_tokens
+#   com este corte: 10 ferramentas, 3.082 prompt_tokens  (-63%)
+#
+# Ficam: pwsh, read/write/edit/read_image, glob/grep, e os plugins locais
+# (analisar_tela/ver_tela, validar_plugin_local — esses vêm do plano do host
+# pelos bundles do package.json, não desta camada).
+
+# Orquestração multi-agente — nunca usada aqui, e cara (workflow sozinho = 4032 chars)
+- id: tool-workflow
+  disabled: true
+- id: workflow-worker-thread
+  disabled: true
+- id: tool-ralph
+  disabled: true
+- id: tool-subagent
+  disabled: true
+- id: tool-subagent-fork
+  disabled: true
+- id: tool-subagent-list-agents
+  disabled: true
+- id: tool-subagent-control
+  disabled: true
+
+# Goals / todos / plano — cerimônia de agente longo, irrelevante pra turno curto
+- id: tool-goal
+  disabled: true
+- id: tool-todo
+  disabled: true
+- id: plan-mode
+  disabled: true
+
+# Busca web: aponta pro Ollama local, não é busca de verdade neste setup
+- id: tool-web
+  disabled: true
+
+# Skills: nenhuma skill instalada neste profile
+- id: tool-skill
+  disabled: true
+
+# Jobs em background: modelo pequeno não gerencia isso bem
+- id: tool-jobs
+  disabled: true
+
+# str_replace_editor (3148 chars) é redundante com read/write/edit do tool-fs
+- id: tool-str-replace-editor
+  disabled: true

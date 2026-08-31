@@ -3,7 +3,7 @@
 #
 # Aqui o contexto é menor porque o 8b sozinho já ocupa ~9,6 GB dos 12,3 GB.
 #
-#   ollama create dsh-8b:12k -f modelfiles/dsh-8b-16k.Modelfile
+#   ollama create dsh-8b:12k -f modelfiles/dsh-8b-12k.Modelfile
 
 FROM qwen3-vl:8b-instruct
 PARAMETER num_ctx 12288
