@@ -12,7 +12,58 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { agruparTexto, formatar, janelaDaLinha } from './index.js'
+import { agruparTexto, formatar, janelaDaLinha, montarArgumentos } from './index.js'
+
+// -- camada de controle ------------------------------------------------------
+// A regra que importa: ver a tela e agir são chamadas separadas, e entre uma e
+// outra a tela pode mudar. Por isso clicar/digitar/teclar sem dizer o que se
+// espera no alvo vira simulação, em vez de agir às cegas.
+
+const temSimular = (r) => r.ps.includes('-Simular')
+
+test('clicar sem janela_esperada não age, vira simulação', () => {
+  const r = montarArgumentos({ acao: 'clicar', x: 10, y: 20 })
+  assert.equal(r.semConfirmacao, true)
+  assert.ok(temSimular(r), 'precisa ir com -Simular para não clicar às cegas')
+})
+
+test('digitar e teclas também exigem confirmação', () => {
+  for (const acao of ['digitar', 'teclas']) {
+    const r = montarArgumentos({ acao, texto: 'oi', teclas: 'ctrl+s' })
+    assert.equal(r.semConfirmacao, true, `${acao} deveria exigir confirmação`)
+    assert.ok(temSimular(r), `${acao} deveria ir simulado`)
+  }
+})
+
+test('com janela_esperada a ação vai valendo', () => {
+  const r = montarArgumentos({ acao: 'clicar', x: 10, y: 20, janela_esperada: 'Bloco' })
+  assert.equal(r.semConfirmacao, false)
+  assert.ok(!temSimular(r))
+  assert.deepEqual(r.ps.slice(-2), ['-JanelaEsperada', 'Bloco'])
+})
+
+test('janela_esperada em branco não conta como confirmação', () => {
+  const r = montarArgumentos({ acao: 'clicar', x: 1, y: 2, janela_esperada: '   ' })
+  assert.equal(r.semConfirmacao, true, 'espaço em branco não é um alvo verificável')
+})
+
+test('mover e rolar não exigem confirmação', () => {
+  // Mover não muda estado nenhum, e é como se sonda a tela antes de agir.
+  for (const acao of ['mover', 'rolar']) {
+    assert.equal(montarArgumentos({ acao, x: 1, y: 2, quantidade: -3 }).semConfirmacao, false)
+  }
+})
+
+test('simular explícito é respeitado mesmo com confirmação dada', () => {
+  const r = montarArgumentos({ acao: 'clicar', x: 1, y: 2, janela_esperada: 'X', simular: true })
+  assert.ok(temSimular(r))
+})
+
+test('coordenada negativa chega intacta na linha de comando', () => {
+  const r = montarArgumentos({ acao: 'mover', x: -1032, y: -168 })
+  const i = r.ps.indexOf('-X')
+  assert.deepEqual([r.ps[i + 1], r.ps[i + 3]], ['-1032', '-168'])
+})
 
 // Duas telas lado a lado com a segunda à esquerda: a principal em (0,0) e a
 // secundária começando em -1920. É o arranjo que quebra código que assume

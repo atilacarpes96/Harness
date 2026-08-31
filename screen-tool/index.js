@@ -9,6 +9,7 @@ const execFileAsync = promisify(execFile)
 
 const AQUI = dirname(fileURLToPath(import.meta.url))
 const INSPECT_PS1 = join(AQUI, 'inspect.ps1')
+const ACT_PS1 = join(AQUI, 'act.ps1')
 const SAIDA_DIR = join(tmpdir(), 'dsh-screen-tool')
 
 // Largura da copia entregue ao modelo de visao. Custo em tokens de imagem,
@@ -300,6 +301,137 @@ function construirFerramenta(nomeFerramenta) {
   }
 }
 
+// Ações que mudam o estado da máquina. Para estas, agir sem dizer o que se
+// espera encontrar no alvo é proibido: ver a tela e agir são chamadas
+// separadas, e entre uma e outra a tela pode ter mudado. Sem `janela_esperada`
+// a chamada vira simulação e devolve o que encontraria — o modelo confirma
+// repetindo a chamada com o título que acabou de ler. Fica impossível clicar
+// às cegas por construção, em vez de por boa vontade.
+const ACOES_QUE_MUDAM = new Set(['clicar', 'digitar', 'teclas'])
+
+// Pura, para poder ser testada sem mover o mouse de ninguém.
+export function montarArgumentos(args) {
+  const acao = String(args?.acao ?? '').trim()
+  const ps = ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', ACT_PS1, '-Acao', acao]
+
+  const num = (v) => (Number.isFinite(v) ? Math.round(v) : null)
+  const x = num(args?.x)
+  const y = num(args?.y)
+  if (x !== null) ps.push('-X', String(x))
+  if (y !== null) ps.push('-Y', String(y))
+  if (args?.texto) ps.push('-Texto', String(args.texto))
+  if (args?.teclas) ps.push('-Teclas', String(args.teclas))
+  if (Number.isFinite(args?.quantidade)) ps.push('-Quantidade', String(Math.round(args.quantidade)))
+  if (args?.botao) ps.push('-Botao', String(args.botao))
+  if (args?.duplo === true) ps.push('-Duplo')
+
+  const esperada = typeof args?.janela_esperada === 'string' ? args.janela_esperada.trim() : ''
+  if (esperada) ps.push('-JanelaEsperada', esperada)
+
+  const semConfirmacao = ACOES_QUE_MUDAM.has(acao) && !esperada
+  if (args?.simular === true || semConfirmacao) ps.push('-Simular')
+
+  return { acao, ps, semConfirmacao }
+}
+
+async function executarAcao(args) {
+  const { acao, ps, semConfirmacao } = montarArgumentos(args)
+  if (!acao) return 'Erro: informe a ação (mover, clicar, digitar, teclas, rolar).'
+
+  let saida
+  try {
+    const r = await execFileAsync('powershell.exe', ps, {
+      windowsHide: true,
+      timeout: 60_000,
+      maxBuffer: 1024 * 1024,
+    })
+    saida = r.stdout
+  } catch (e) {
+    // act.ps1 sai com código 1 quando aborta, e o json do motivo vem no stdout.
+    saida = e.stdout || ''
+    if (!saida.trim()) return `Erro ao executar a ação: ${e.message}`
+  }
+
+  let dados
+  try {
+    dados = JSON.parse(String(saida).trim().split('\n').pop())
+  } catch {
+    return `Resposta ilegível da camada de controle: ${String(saida).slice(0, 400)}`
+  }
+
+  if (dados.erro) return `AÇÃO NÃO REALIZADA. ${dados.erro}`
+
+  if (semConfirmacao) {
+    return [
+      `AÇÃO NÃO REALIZADA — falta confirmar o alvo.`,
+      `No alvo está a janela: "${dados.janela_no_alvo}"`,
+      `Se é essa mesmo, repita a chamada incluindo janela_esperada com parte desse título.`,
+      `Isso existe porque entre ver a tela e agir ela pode ter mudado.`,
+    ].join('\n')
+  }
+
+  if (dados.simulado) {
+    return `Simulação: nada foi feito. No alvo está a janela "${dados.janela_no_alvo}".`
+  }
+
+  const linhas = [`Ação "${acao}" realizada.`]
+  if (dados.cursor_em) linhas.push(`Cursor em (${dados.cursor_em[0]},${dados.cursor_em[1]}).`)
+  if (dados.caracteres != null) linhas.push(`${dados.caracteres} caracteres digitados.`)
+  if (dados.combinacao) linhas.push(`Combinação enviada: ${dados.combinacao}.`)
+  linhas.push(`Janela em foco depois: "${dados.janela_em_foco_depois}".`)
+  linhas.push('Confira o efeito com analisar_tela antes da próxima ação.')
+  return linhas.join('\n')
+}
+
+function construirFerramentaAcao() {
+  return {
+    name: 'interagir_tela',
+    description:
+      'Move o mouse, clica, digita texto, envia combinações de teclas ou rola a tela. ' +
+      'Usa as MESMAS coordenadas devolvidas por analisar_tela. Chame analisar_tela antes, ' +
+      'para saber onde clicar e qual o título da janela alvo. Para clicar, digitar ou teclar ' +
+      'é obrigatório informar janela_esperada: sem isso a chamada só simula e informa o que ' +
+      'encontrou no alvo.',
+    parameters: {
+      type: 'object',
+      properties: {
+        acao: {
+          type: 'string',
+          enum: ['mover', 'clicar', 'digitar', 'teclas', 'rolar'],
+          description: 'O que fazer.',
+        },
+        x: { type: 'integer', description: 'Coordenada X do alvo (mover, clicar, rolar).' },
+        y: { type: 'integer', description: 'Coordenada Y do alvo (mover, clicar, rolar).' },
+        texto: { type: 'string', description: 'Texto a digitar (ação digitar).' },
+        teclas: {
+          type: 'string',
+          description: 'Combinação, por exemplo "ctrl+s", "enter", "shift+end" (ação teclas).',
+        },
+        quantidade: {
+          type: 'integer',
+          description: 'Entalhes de rolagem; negativo rola para baixo (ação rolar).',
+        },
+        botao: { type: 'string', enum: ['left', 'right', 'middle'], description: 'Botão do mouse.' },
+        duplo: { type: 'boolean', description: 'Clique duplo.' },
+        janela_esperada: {
+          type: 'string',
+          description:
+            'Parte do título da janela que deve estar no alvo. Obrigatório para clicar, digitar e teclas.',
+        },
+        simular: { type: 'boolean', description: 'Só dizer o que faria, sem fazer.' },
+      },
+      required: ['acao'],
+      additionalProperties: false,
+    },
+    output: {
+      schema: { type: 'string' },
+      render: (_args, value) => [{ type: 'text', text: value }],
+    },
+    timeoutMs: 90_000,
+    execute: executarAcao,
+  }
+}
+
 // Modelos menores erravam o nome da ferramenta, e a resposta na época foi
 // registrar 6 apelidos. Em 31/08/2026 descobrimos que o motivo real era outro:
 // o Ollama rodava com num_ctx 4096 e truncava ~76% do prompt, então o modelo
@@ -314,4 +446,5 @@ export function apply(ctx) {
   for (const nomeFerramenta of APELIDOS) {
     ctx.tools.register(construirFerramenta(nomeFerramenta))
   }
+  ctx.tools.register(construirFerramentaAcao())
 }

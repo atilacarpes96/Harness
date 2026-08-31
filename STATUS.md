@@ -82,9 +82,19 @@ Isso já decidiu uma escolha de arquitetura: a camada de percepção devolve
 prosa. Uma descrição não é clicável; um retângulo é. Quem for construir a camada
 de controle não precisa refazer a percepção, só consumir o que já sai de lá.
 
-Ainda **não existe** nenhuma capacidade de entrada (mouse/teclado), e a
-ferramenta declara isso na própria descrição. Quando for construída, vale tratar
-como mudança de categoria: hoje o plugin só observa, e observar é reversível.
+**A camada de controle foi construída em 31/08** (`act.ps1` + a tool
+`interagir_tela`): mouse, clique, digitação, combinações de teclas e rolagem,
+consumindo as mesmas coordenadas que a percepção devolve. Verificado com o
+modelo local de 4B fazendo o laço inteiro sozinho — ver a tela, achar a janela,
+clicar e digitar — com o texto conferido byte a byte no controle de destino.
+
+Isso muda a categoria do plugin: **observar é reversível, agir não é.** Daí as
+três travas, descritas em `screen-tool/README.txt`:
+
+1. clicar/digitar/teclar sem `janela_esperada` não agem, viram simulação
+2. coordenada fora da área virtual é recusada
+3. **Scroll Lock ligado bloqueia toda injeção** — veto de hardware, útil para
+   deixar o agente observando mas proibido de agir
 
 ## Git
 

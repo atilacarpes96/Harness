@@ -90,10 +90,61 @@ Para instalar em um profile novo:
   dsh plugin --profile <nome> add link:E:/DSHARNESS/screen-tool
 
 
+CAMADA DE CONTROLE — interagir_tela (act.ps1)
+
+Move o mouse, clica, digita, envia combinações e rola. Consome as MESMAS
+coordenadas que o analisar_tela devolve, sem conversão no meio.
+
+  interagir_tela {"acao":"mover",  "x":-550,"y":360}
+  interagir_tela {"acao":"clicar", "x":-550,"y":360,"janela_esperada":"Bloco"}
+  interagir_tela {"acao":"digitar","texto":"ação","janela_esperada":"Bloco"}
+  interagir_tela {"acao":"teclas", "teclas":"ctrl+shift+end","janela_esperada":"Bloco"}
+  interagir_tela {"acao":"rolar",  "x":100,"y":100,"quantidade":-3}
+
+TRÊS TRAVAS, e por que cada uma existe:
+
+1. CONFIRMAÇÃO DE ALVO. Ver a tela e agir são chamadas separadas, e entre uma
+   e outra a tela muda. Clicar, digitar e teclar sem `janela_esperada` NÃO
+   agem: viram simulação e devolvem qual janela está no alvo, para a chamada
+   ser repetida com o título. Clicar às cegas fica impossível por construção,
+   e não por boa vontade do modelo.
+
+2. LIMITE DA ÁREA VIRTUAL. Coordenada fora dela é recusada antes de qualquer
+   evento.
+
+3. SCROLL LOCK. Com ele ligado, nada é injetado. É um veto de hardware que
+   você aciona sozinho, sem depender do agente se comportar. Use quando quiser
+   deixar o agente observando mas proibido de agir.
+
+Cada resposta diz qual janela estava no alvo antes e qual ficou em foco depois.
+
+DETALHES QUE CUSTARAM DEPURAÇÃO
+
+- As structs do SendInput são montadas em C#, não em PowerShell. No PowerShell,
+  `$i.u.mi.dx = ...` escreve numa CÓPIA do value type, que é descartada: o
+  SendInput aceita os eventos, informa sucesso, e nada acontece.
+- Posicionar é em duas etapas: SendInput absoluto (gera o WM_MOUSEMOVE de
+  verdade, então hover funciona) e depois SetCursorPos para encaixar no pixel.
+  A normalização em 65535 passos erra ~1px por eixo numa área virtual de
+  3640px — testadas três fórmulas, o resíduo é o mesmo. Verificado: desvio 0
+  em todos os cantos, incluindo coordenada negativa.
+- Toda tecla vai com scan code real (MapVirtualKey) e com o bit de estendida
+  quando é seta/home/end/etc. Sem o scan code, `ctrl+home` funciona mas
+  `shift+end` não seleciona — o Shift não fica registrado como segurado, e o
+  sintoma parece "essa combinação não existe".
+- Texto vai por KEYEVENTF_UNICODE, então acentuação e cedilha não dependem do
+  layout ABNT2 estar ativo. Verificado byte a byte: 40 caracteres com ç, ã, õ,
+  é, ê e travessão chegaram idênticos.
+
+
 LIMITES CONHECIDOS
 
-- Só observa. Não move o mouse, não clica, não digita.
 - Não lê conteúdo de janela minimizada (o Windows não a desenha).
 - Janela que cruza dois monitores é atribuída àquele onde tem mais área.
 - O OCR erra em fonte muito pequena ou com pouco contraste; a coordenada
   continua correta mesmo quando o texto sai imperfeito.
+- `ctrl+a` não funciona em TextBox multilinha do WinForms — é limitação do
+  controle, não da injeção (`ctrl+home` e `ctrl+shift+end` funcionam nele).
+  Para selecionar tudo de forma portátil: `ctrl+home` e depois
+  `ctrl+shift+end`.
+- Não há desfazer. O agente age na máquina de verdade.
