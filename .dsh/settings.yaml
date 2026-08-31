@@ -88,6 +88,39 @@ llm-pi-ai:
       displayName: Ollama
       apiKeyEnv: OLLAMA_LAUNCH_DSH_API_KEY
       api: openai-completions
+    anthropic:
+      # Rota NATIVA da API de Mensagens (o dsh traz AnthropicMessagesCompat),
+      # e nao a camada de compatibilidade OpenAI: uso de ferramenta, cache de
+      # prompt e thinking funcionam do jeito certo.
+      #
+      # Exige a variavel de ambiente ANTHROPIC_API_KEY. Cobranca e por token,
+      # separada da assinatura do Claude Code.
+      baseURL: https://api.anthropic.com
+      api: anthropic-messages
+      apiKeyEnv: ANTHROPIC_API_KEY
+      displayName: Claude (API Anthropic)
+      models:
+        - id: claude-opus-5
+          name: Claude Opus 5 (o mais capaz)
+          contextWindow: 1000000
+          maxTokens: 64000
+          input:
+            - text
+            - image
+        - id: claude-sonnet-5
+          name: Claude Sonnet 5 (equilibrio)
+          contextWindow: 1000000
+          maxTokens: 64000
+          input:
+            - text
+            - image
+        - id: claude-haiku-4-5
+          name: Claude Haiku 4.5 (mais barato)
+          contextWindow: 200000
+          maxTokens: 8192
+          input:
+            - text
+            - image
 web-search-deepseek:
   apiKeyEnv: OLLAMA_LAUNCH_DSH_API_KEY
   baseURL: http://127.0.0.1:11434/v1
