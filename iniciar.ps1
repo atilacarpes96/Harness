@@ -25,6 +25,14 @@ param(
 $ErrorActionPreference = 'Stop'
 $RAIZ = Split-Path -Parent $MyInvocation.MyCommand.Path
 $OLLAMA = 'http://127.0.0.1:11434'
+
+# Onde a URL da instancia fica guardada. Existe por um motivo concreto: o dsh
+# gera um token de acesso a cada boot e SO imprime no console. Fechar a janela
+# torna o servidor inalcancavel — ele continua vivo, segurando a porta, e nao ha
+# como entrar. Guardando a URL, clicar no icone de novo leva de volta para a
+# instancia aberta em vez de precisar mata-la.
+$ESTADO_DIR = Join-Path $env:LOCALAPPDATA 'dsharness'
+$ESTADO = Join-Path $ESTADO_DIR 'instancia.json'
 # O Ollama deste usuario guarda os modelos fora do padrao. Sem isto, um serve
 # iniciado por aqui acha que nao existe modelo nenhum.
 $MODELOS = 'E:\Ollama'
@@ -164,12 +172,32 @@ try {
 } catch { $ocupada = $false }
 
 if ($ocupada) {
-  Aviso ("a porta {0} ja esta em uso." -f $Porta)
+  # Porta ocupada tem dois casos MUITO diferentes, e confundi-los e o que fazia
+  # a experiencia ser ruim: instancia viva e alcancavel (basta abrir), ou orfa
+  # cujo token se perdeu junto com o console (so serve para ser encerrada).
+  $urlSalva = $null
+  if (Test-Path $ESTADO) {
+    try {
+      $j = Get-Content $ESTADO -Raw -Encoding UTF8 | ConvertFrom-Json
+      if ($j.porta -eq $Porta -and $j.url) {
+        $r = Invoke-WebRequest -Uri $j.url -TimeoutSec 4 -UseBasicParsing -ErrorAction Stop
+        if ($r.StatusCode -eq 200) { $urlSalva = $j.url }
+      }
+    } catch { $urlSalva = $null }
+  }
+
+  if ($urlSalva) {
+    Ok 'ja esta aberto e alcancavel; abrindo no navegador'
+    Start-Process $urlSalva
+    Start-Sleep -Milliseconds 900
+    exit 0
+  }
+
+  Aviso ("a porta {0} esta ocupada por uma instancia orfa." -f $Porta)
   Write-Host ''
-  Write-Host ("  Provavelmente o DSHARNESS ja esta aberto. Tente: http://localhost:{0}" -f $Porta)
-  Write-Host '  Se quiser uma segunda instancia, rode o atalho com outra porta:'
-  Write-Host ('    powershell -ExecutionPolicy Bypass -File "{0}" -Porta {1}' -f `
-    (Join-Path $RAIZ 'iniciar.ps1'), ($Porta + 1))
+  Write-Host '  O token dela se perdeu junto com o console, entao nao ha como entrar:'
+  Write-Host '  o servidor continua vivo mas inalcancavel. Encerre e suba de novo com:'
+  Write-Host ('    powershell -ExecutionPolicy Bypass -File "{0}" -Limpar' -f (Join-Path $RAIZ 'iniciar.ps1'))
   Write-Host ''
   Read-Host '  Enter para fechar'
   exit 0
@@ -184,4 +212,24 @@ Write-Host ''
 $dsh = (Get-Command dsh -ErrorAction SilentlyContinue)
 if (-not $dsh) { Erro "o comando 'dsh' nao foi encontrado no PATH." }
 
-& dsh web --port $Porta
+# Repassa cada linha do dsh para o console e, de passagem, captura a URL com
+# token para o arquivo de estado. E o unico momento em que ela existe.
+New-Item -ItemType Directory -Force -Path $ESTADO_DIR | Out-Null
+$capturada = $false
+
+& dsh web --port $Porta 2>&1 | ForEach-Object {
+  $linha = $_
+  $linha
+  if (-not $capturada -and "$linha" -match '(http://[^\s]+token=[A-Za-z0-9_\-]+)') {
+    $capturada = $true
+    $url = $Matches[1]
+    ([pscustomobject]@{
+      porta = $Porta
+      url = $url
+      pid_do_iniciador = $PID
+      em = (Get-Date).ToString('o')
+    } | ConvertTo-Json -Compress) | Set-Content -Path $ESTADO -Encoding utf8
+    Write-Host ''
+    Write-Host '  Endereco guardado. Clicar no icone de novo abre esta mesma sessao.' -ForegroundColor DarkGray
+  }
+}

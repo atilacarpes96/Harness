@@ -32,9 +32,13 @@ Depois é só o ícone. Ele confere o Ollama (e sobe, se preciso), confere o mod
 padrão, aquece o modelo e abre a interface — parando com uma mensagem útil se
 algum passo falhar, em vez de abrir algo quebrado.
 
-Fechar a janela do navegador **não** encerra o servidor: o processo continua
-segurando a porta. O inicializador avisa quando encontra instâncias antigas, e
-`-Limpar` encerra todas antes de subir:
+Clicar no ícone com o DSHARNESS já aberto **abre a sessão que existe**, em vez
+de subir outra. Isso depende de um detalhe do dsh: ele gera um token de acesso a
+cada boot e só o imprime no console. Fechar aquela janela deixava o servidor
+vivo e **inalcançável** — o inicializador guarda a URL para que isso não aconteça.
+
+Se mesmo assim sobrar uma instância órfã (de antes desse ajuste, por exemplo),
+ele diz isso com todas as letras e `-Limpar` encerra tudo antes de subir:
 
 ```bash
 powershell -ExecutionPolicy Bypass -File iniciar.ps1 -Limpar

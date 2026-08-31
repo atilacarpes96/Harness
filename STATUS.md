@@ -132,6 +132,16 @@ Detalhe que só apareceu testando: sem conferir a porta antes, uma instância j�
 rodando fazia o boot morrer com **30 linhas de stack trace do Node**, com o
 `EADDRINUSE` enterrado no meio. Agora avisa em uma linha e sugere outra porta.
 
+**O achado que mudou o desenho:** o `dsh web` gera um token de acesso a cada boot
+e **só o imprime no console** — verificado que ele não é persistido em lugar
+nenhum. Fechar a janela deixa o servidor vivo e *inalcançável*, segurando a
+porta. Foi assim que duas instâncias ficaram presas desde 30/08.
+
+A resposta óbvia (encerrar sempre ao iniciar) mataria também uma sessão viva em
+uso. O inicializador passou a **guardar a URL com token**, e agora distingue os
+dois casos: instância viva e alcançável → abre ela; órfã → explica e manda usar
+`-Limpar`. Clicar no ícone com o DSHARNESS aberto leva de volta para a sessão.
+
 Isso muda a categoria do plugin: **observar é reversível, agir não é.** Daí as
 três travas, descritas em `screen-tool/README.txt`:
 
