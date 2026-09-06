@@ -63,37 +63,6 @@ llm-pi-ai:
             - image
           maxTokens: 8192
           name: qwen3-vl:8b-instruct
-        # Rota OPCIONAL para tarefa que o 4B nao der conta. Ver
-        # modelfiles/dsh-36b-32k.Modelfile para os numeros medidos.
-        #
-        # `reasoningEfforts` com "off" -> "none" NAO e decorativo: sem isso
-        # este modelo pensa em toda chamada e o raciocinio come o orcamento
-        # inteiro de saida (medido: 512 tokens de completion e content VAZIO).
-        # O valor de "off" e o wire value que o dsh manda literalmente, entao
-        # tem que ser a string "none", nao um campo vazio.
-        #
-        # E NAO declare `compat: {thinkingFormat: qwen}` aqui, ao contrario do
-        # qwen3-vl:8b acima: esse switch faz o dsh mandar `enable_thinking` no
-        # LUGAR do `reasoning_effort`, e o endpoint /v1 do Ollama ignora o
-        # enable_thinking. Testado em 05/09/2026 contra /v1/chat/completions:
-        #
-        #   enable_thinking: false          -> 2.319 chars de raciocinio
-        #   think: false (topo)             -> 1.539 chars
-        #   chat_template_kwargs...         -> 1.435 chars
-        #   reasoning_effort: "none"        ->     0 chars, resposta em 2,5 s
-        #
-        # `PARAMETER think false` no Modelfile tambem nao existe: o
-        # `ollama create` recusa com "unknown parameter 'think'".
-        - contextWindow: 32768
-          id: dsh-36b:32k
-          input:
-            - text
-            - image
-          maxTokens: 4096
-          name: dsh-36b:32k (qwen3.6 36B MoE, lento, para tarefa dificil)
-          reasoningEfforts:
-            "off": "none"
-            high: high
         # ATENCAO: as duas rotas :cloud abaixo NAO funcionam nesta conta.
         # Testado em 05/09/2026 contra /v1/chat/completions, as duas
         # respondem: "this model requires a subscription or extra usage,
