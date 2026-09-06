@@ -124,6 +124,49 @@ export function abaTocando(nome) {
   return MARCA_TOCANDO.test(String(nome ?? ''))
 }
 
+// O estado do player, lido da arvore de acessibilidade da PAGINA.
+//
+// Isto e o achado que resolve a queixa: o botao de play/pause do YouTube se
+// chama "Pausa (k)" enquanto o video TOCA (clicar ali pausa) e "Reproduzir (k)"
+// quando esta parado. O nome do botao E a resposta para "o play funcionou?".
+// Medido ao vivo na aba do usuario: 791 elementos na arvore, e nas posicoes
+// 28-30 estavam "Pausa (k)", "Sem audio (m)" e "24 Minutos 49 Segundos de 24
+// Minutos 49 Segundos".
+//
+// Por que isso importa mais que parecer: na sessao session-7ceeaf4e o agente
+// tentou julgar o play por OCR e por um modelo de visao olhando um frame
+// parado, e ficou pausando e despausando. Video pausado e video tocando sao a
+// mesma imagem num instante qualquer — a pergunta e inrespondivel por pixel, e
+// trivial por aqui.
+const BOTAO_PAUSAR = /^(pausar?|pause)\b/i
+const BOTAO_TOCAR = /^(reproduzir|tocar|play)\b/i
+// "24 Minutos 49 Segundos de 24 Minutos 49 Segundos" / "... of ...". Exige
+// numero dos dois lados para nao casar com "pagina 3 de 10".
+const POSICAO = /\d[^]*\s(?:de|of)\s[^]*\d/i
+
+export function estadoDaMidia(elementos) {
+  const botoes = (elementos ?? []).filter(
+    (e) => e.tipo === 'Button' && e.habilitado && e.nome,
+  )
+
+  const pausar = botoes.find((e) => BOTAO_PAUSAR.test(e.nome))
+  const tocar = botoes.find((e) => BOTAO_TOCAR.test(e.nome))
+  const botao = pausar ?? tocar
+  if (!botao) return null
+
+  const posicao = botoes.find(
+    (e) => e !== botao && POSICAO.test(e.nome) && /\d/.test(e.nome),
+  )
+
+  return {
+    tocando: Boolean(pausar),
+    nome: botao.nome,
+    x: botao.x,
+    y: botao.y,
+    posicao: posicao ? posicao.nome : null,
+  }
+}
+
 const PROCESSOS_NAVEGADOR = new Set([
   'chrome', 'msedge', 'firefox', 'brave', 'opera', 'vivaldi', 'chromium',
 ])
@@ -331,7 +374,7 @@ export function formatar(
   // largura da aba — "NerdCast 1046 - Qual" — entao o nome do site nunca
   // aparece. Pedir "entra numa aba do youtube" era impossivel de cumprir sem
   // esta secao.
-  if (abas && abas.lista.length) {
+  if (abas?.lista?.length) {
     out.push('', `ABAS em "${abas.janela}" (${abas.lista.length})`)
     for (const a of abas.lista) {
       out.push(`  "${a.nome}" em (${a.x},${a.y})`)
@@ -346,6 +389,20 @@ export function formatar(
         '  conferir se o play funcionou — a imagem da tela nao responde isso.',
       )
     }
+  }
+
+  if (abas?.midia) {
+    const m = abas.midia
+    out.push(
+      '',
+      `MIDIA na aba ativa: ${m.tocando ? 'TOCANDO AGORA' : 'PARADA'}`,
+      `  botao "${m.nome}" em (${m.x},${m.y}) — clicar ali ${m.tocando ? 'PAUSA' : 'DA PLAY'}`,
+    )
+    if (m.posicao) out.push(`  posicao: ${m.posicao}`)
+    out.push(
+      '  Confira o play POR AQUI, nao pela imagem: video parado e video tocando',
+      '  sao a mesma foto num instante qualquer. O nome do botao e que muda.',
+    )
   }
 
   const totalLinhas = grupos.reduce((n, g) => n + g.linhas.length, 0)
@@ -445,17 +502,56 @@ function construirFerramenta(nomeFerramenta) {
           ? args.controles.trim()
           : null
       if (janelaControles) {
+        // Terceira variante da armadilha do reflexo. Na sessao session-7ceeaf4e
+        // o modelo pediu os controles de "YouTube Video Playback Guide", que
+        // era a ABA DO PROPRIO DSH, recebeu so a moldura do navegador e
+        // concluiu — por escrito — que "o Chrome nao expoe os elementos
+        // internos da pagina via arvore de acessibilidade". Conclusao errada, e
+        // cara: era justamente o caminho que resolvia a tarefa. Recusar aqui
+        // evita a conclusao errada melhor do que devolver a lista inutil.
+        if (ehJanelaPropria(janelaControles)) {
+          return [
+            `"${janelaControles}" e a janela do PROPRIO dsh. Nao listei os controles:`,
+            'seriam os controles da sua propria conversa, e nao do programa que voce',
+            'quer controlar. Pior, a lista viria so com a moldura do navegador e',
+            'daria a impressao de que a pagina nao expoe nada — o que e falso.',
+            'Peca os controles da janela do alvo. Veja a lista JANELAS de analisar_tela.',
+          ].join('\n')
+        }
+
         const el = await lerElementos(janelaControles)
         if (el.erro) {
           return `${el.erro}\nJanelas abertas: ${(el.janelas_abertas ?? []).join(' | ')}`
         }
-        const lista = (el.elementos ?? [])
-          .filter((e) => e.habilitado)
+        if (ehJanelaPropria(el.janela)) {
+          return [
+            `"${janelaControles}" casou com "${el.janela}", que e a janela do PROPRIO dsh.`,
+            'Nao listei: seriam os controles da sua propria conversa.',
+            'Peca pelo titulo da janela do alvo, da lista JANELAS de analisar_tela.',
+          ].join('\n')
+        }
+
+        const acionaveis = (el.elementos ?? []).filter(
+          (e) => e.habilitado && e.nome && TIPOS_ACIONAVEIS.has(e.tipo),
+        )
+        const lista = acionaveis
+          .slice(0, MAX_CONTROLES_LISTADOS)
           .map((e) => `  "${e.nome}" (id: ${e.id}, ${e.tipo}) em (${e.x},${e.y})`)
+        const cortados = acionaveis.length - lista.length
+        const midia = estadoDaMidia(el.elementos)
         return [
-          `CONTROLES de "${el.janela}" — ${lista.length} clicáveis`,
+          `CONTROLES de "${el.janela}" — ${acionaveis.length} acionáveis`,
           'Use a ação clicar_elemento com o nome ou, de preferência, o id.',
+          ...(midia
+            ? [
+                `MIDIA: ${midia.tocando ? 'TOCANDO' : 'PARADA'} — botao "${midia.nome}"` +
+                  `${midia.posicao ? `, posicao ${midia.posicao}` : ''}`,
+              ]
+            : []),
           ...lista,
+          ...(cortados > 0
+            ? [`  [...] ${cortados} controles omitidos. Procure pelo nome com clicar_elemento.`]
+            : []),
         ].join('\n')
       }
 
@@ -551,12 +647,28 @@ export function acharTexto(dados, procurado, filtroJanela) {
 // botão de símbolo. Na Calculadora, procurar "+" por OCR casava com "tvl+" — o
 // botão de MEMÓRIA mal lido — e "=" não era encontrado. Aqui vêm "Mais" e
 // "Igual a", com retângulo exato.
+// Teto da VARREDURA. O padrao do elements.ps1 e 300, e uma pagina do YouTube
+// tem 435 elementos que passam no filtro de tipo — medido ao vivo. Cortar a
+// varredura perde alvo real; o que precisa de teto e a SAIDA, que e o que
+// consome contexto, e essa e limitada em construirFerramenta.
+const MAX_ELEMENTOS = 600
+
+// Tipos que valem listar para quem vai AGIR. Group, Pane e Image entulham a
+// lista de uma pagina web sem oferecer nada para clicar.
+const TIPOS_ACIONAVEIS = new Set([
+  'Button', 'Hyperlink', 'Edit', 'CheckBox', 'RadioButton',
+  'ComboBox', 'MenuItem', 'TabItem', 'ListItem', 'Slider',
+])
+
+const MAX_CONTROLES_LISTADOS = 120
+
 async function lerElementos(janela) {
   const saida = join(SAIDA_DIR, 'elementos.json')
   await mkdir(SAIDA_DIR, { recursive: true })
   const args = [
     '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass',
     '-File', ELEMENTS_PS1, '-Janela', janela, '-Out', saida,
+    '-Max', String(MAX_ELEMENTOS),
   ]
   try {
     await execFileAsync('powershell.exe', args, {
@@ -605,8 +717,9 @@ async function lerAbas(dados) {
     .filter((e) => e.tipo === 'TabItem' && e.y < limiteTira)
     .map((e) => ({ nome: limparNomeAba(e.nome), x: e.x, y: e.y }))
     .filter((e) => e.nome)
-  if (!lista.length) return null
-  return { janela: el.janela ?? frente.titulo, lista }
+  const midia = estadoDaMidia(el?.elementos)
+  if (!lista.length && !midia) return null
+  return { janela: el.janela ?? frente.titulo, lista, midia }
 }
 
 // Casa por AutomationId exato primeiro: é o identificador estável, e não muda

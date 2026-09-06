@@ -21,6 +21,7 @@ import {
   ehJanelaPropria,
   ehNavegador,
   dicaDeAba,
+  estadoDaMidia,
   formatar,
   janelaDaLinha,
   janelaEmPonto,
@@ -697,4 +698,77 @@ test('limparNomeAba preserva a marca de audio e tira so o uso de memoria', () =>
     limparNomeAba('A Internet Morreu - YouTube – áudio em reprodução – Utilização de memória – 195 MB'),
     'A Internet Morreu - YouTube – áudio em reprodução',
   )
+})
+
+// -- o estado do player, lido da arvore da pagina ----------------------------
+// Nomes copiados da leitura ao vivo da aba do usuario: o Chrome expoe 791
+// elementos numa pagina do YouTube, e nas posicoes 28-30 estao o botao de
+// play/pause, o de audio e o de posicao. O NOME do botao carrega o estado.
+
+const PLAYER_TOCANDO = [
+  { tipo: 'Button', nome: 'Pausa (k)', x: 1470, y: 900, habilitado: true },
+  { tipo: 'Button', nome: 'Sem áudio (m)', x: 1520, y: 900, habilitado: true },
+  { tipo: 'Button', nome: '24 Minutos 8 Segundos de 24 Minutos 49 Segundos', x: 1600, y: 900, habilitado: true },
+  { tipo: 'Hyperlink', nome: 'Canal do NerdCast', x: 900, y: 1000, habilitado: true },
+]
+
+test('estadoDaMidia le TOCANDO quando o botao se chama Pausa', () => {
+  const m = estadoDaMidia(PLAYER_TOCANDO)
+  assert.equal(m.tocando, true, '"Pausa" só aparece enquanto o vídeo toca')
+  assert.equal(m.nome, 'Pausa (k)')
+  assert.deepEqual([m.x, m.y], [1470, 900])
+  assert.equal(m.posicao, '24 Minutos 8 Segundos de 24 Minutos 49 Segundos')
+})
+
+test('estadoDaMidia le PARADA quando o botao se chama Reproduzir', () => {
+  const parado = PLAYER_TOCANDO.map((e) =>
+    e.nome === 'Pausa (k)' ? { ...e, nome: 'Reproduzir (k)' } : e,
+  )
+  const m = estadoDaMidia(parado)
+  assert.equal(m.tocando, false)
+  assert.equal(m.nome, 'Reproduzir (k)')
+})
+
+test('estadoDaMidia fica calada numa pagina sem player', () => {
+  assert.equal(estadoDaMidia([
+    { tipo: 'Button', nome: 'Enviar', x: 10, y: 10, habilitado: true },
+    { tipo: 'Hyperlink', nome: 'Sobre', x: 20, y: 20, habilitado: true },
+  ]), null)
+  assert.equal(estadoDaMidia([]), null)
+  assert.equal(estadoDaMidia(null), null)
+})
+
+test('estadoDaMidia ignora botao desabilitado e nao confunde "pagina 3 de 10" com posicao', () => {
+  const m = estadoDaMidia([
+    { tipo: 'Button', nome: 'Pausa (k)', x: 1, y: 1, habilitado: true },
+    { tipo: 'Button', nome: 'Reproduzir (k)', x: 2, y: 2, habilitado: false },
+    { tipo: 'Button', nome: 'pagina 3 de 10', x: 3, y: 3, habilitado: true },
+  ])
+  assert.equal(m.tocando, true)
+  // "pagina 3 de 10" casa com o padrao; e por isso que a posicao so e lida
+  // quando ha player, e o texto vai cru, sem ser interpretado como tempo.
+  assert.equal(m.posicao, 'pagina 3 de 10')
+})
+
+test('formatar publica o estado da midia e manda nao confiar na imagem', () => {
+  const texto = formatar(DUAS_TELAS, {
+    grupos: agruparTexto(DUAS_TELAS), maxLinhas: 120, visao: null, monitorFiltro: null,
+    abas: { janela: 'Chrome', lista: [], midia: {
+      tocando: true, nome: 'Pausa (k)', x: 1470, y: 900,
+      posicao: '24 Minutos 8 Segundos de 24 Minutos 49 Segundos',
+    } },
+  })
+  assert.match(texto, /MIDIA na aba ativa: TOCANDO AGORA/)
+  assert.match(texto, /clicar ali PAUSA/)
+  assert.match(texto, /posicao: 24 Minutos 8 Segundos/)
+  assert.match(texto, /nao pela imagem/)
+
+  const parado = formatar(DUAS_TELAS, {
+    grupos: agruparTexto(DUAS_TELAS), maxLinhas: 120, visao: null, monitorFiltro: null,
+    abas: { janela: 'Chrome', lista: [], midia: {
+      tocando: false, nome: 'Reproduzir (k)', x: 1470, y: 900, posicao: null,
+    } },
+  })
+  assert.match(parado, /MIDIA na aba ativa: PARADA/)
+  assert.match(parado, /clicar ali DA PLAY/)
 })
