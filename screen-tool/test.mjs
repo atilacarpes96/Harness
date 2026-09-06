@@ -16,9 +16,15 @@ import {
   acharElemento,
   acharTexto,
   agruparTexto,
+  assinaturaDaTela,
+  ehJanelaPropria,
+  ehNavegador,
   formatar,
   janelaDaLinha,
+  janelaEmPonto,
+  limparNomeAba,
   montarArgumentos,
+  motivoParaNaoClicar,
   normalizar,
 } from './index.js'
 
@@ -416,4 +422,209 @@ test('formatar avisa quando corta linhas pelo limite', () => {
     monitorFiltro: null,
   })
   assert.match(texto, /4 linhas omitidas pelo limite de 2/)
+})
+
+// -- a armadilha do proprio reflexo ------------------------------------------
+// O dsh roda numa aba do navegador, entao a conversa fica NA TELA. Tudo que o
+// agente escreve, e tudo que o usuario digita, vira texto clicavel. Medido na
+// sessao session-9932b1ee: pedido "entra numa aba do youtube e da play", o
+// agente procurou "youtube" na tela, achou a MENSAGEM DO USUARIO, clicou nela e
+// anunciou que o video estava tocando.
+
+test('ehJanelaPropria reconhece a janela do dsh e poupa as outras', () => {
+  assert.ok(
+    ehJanelaPropria('AI Coding Assistant Session — DeepSeek Harness - Google Chrome'),
+    'e o titulo exato da sessao medida',
+  )
+  assert.ok(ehJanelaPropria({ titulo: 'algo — DeepSeek Harness' }))
+  assert.ok(!ehJanelaPropria('NerdCast 1046 - Qual é a Pauta? - YouTube - Google Chrome'))
+  assert.ok(!ehJanelaPropria(null), 'sem janela não é a janela do agente')
+})
+
+test('janelaEmPonto devolve a janela da frente sob a coordenada', () => {
+  // (400,400) esta dentro do Editor e do "Atras do Editor"; vale a da frente.
+  assert.equal(janelaEmPonto(DUAS_TELAS.janelas, 400, 400).titulo, 'Editor')
+  assert.equal(janelaEmPonto(DUAS_TELAS.janelas, -1800, 60).titulo, 'Navegador')
+  assert.equal(janelaEmPonto(DUAS_TELAS.janelas, 10, 1420), null, 'barra de tarefas')
+})
+
+// -- "mudou alguma coisa?" ---------------------------------------------------
+// Sem isto o modelo recebe a mesma parede de texto e conclui o que quiser dela.
+
+test('assinaturaDaTela ignora o carimbo de tempo', () => {
+  const outroInstante = { ...DUAS_TELAS, capturado_em: '2030-01-01T00:00:00-03:00' }
+  assert.equal(assinaturaDaTela(DUAS_TELAS), assinaturaDaTela(outroInstante))
+})
+
+test('assinaturaDaTela nao depende da ordem em que o OCR devolveu', () => {
+  const invertido = {
+    ...DUAS_TELAS,
+    ocr: DUAS_TELAS.ocr.map((b) => ({ ...b, linhas: [...b.linhas].reverse() })),
+  }
+  assert.equal(assinaturaDaTela(DUAS_TELAS), assinaturaDaTela(invertido))
+})
+
+test('assinaturaDaTela muda quando o texto da tela muda', () => {
+  const mexido = structuredClone(DUAS_TELAS)
+  mexido.ocr[0].linhas[0].texto = 'outra coisa'
+  assert.notEqual(assinaturaDaTela(DUAS_TELAS), assinaturaDaTela(mexido))
+})
+
+test('assinaturaDaTela muda quando uma janela se move', () => {
+  const mexido = structuredClone(DUAS_TELAS)
+  mexido.janelas[0].x = 999
+  assert.notEqual(assinaturaDaTela(DUAS_TELAS), assinaturaDaTela(mexido))
+})
+
+test('formatar avisa, no topo, quando a tela esta identica a anterior', () => {
+  const texto = formatar(DUAS_TELAS, {
+    grupos: agruparTexto(DUAS_TELAS),
+    maxLinhas: 120,
+    visao: null,
+    monitorFiltro: null,
+    semMudancaHa: 12_000,
+  })
+  assert.match(texto, /IDENTICA a leitura anterior \(ha 12s\)/)
+  assert.match(texto, /NAO teve efeito visivel/)
+  const semAviso = formatar(DUAS_TELAS, {
+    grupos: agruparTexto(DUAS_TELAS),
+    maxLinhas: 120,
+    visao: null,
+    monitorFiltro: null,
+  })
+  assert.ok(!/IDENTICA/.test(semAviso), 'tela nova não leva aviso')
+})
+
+// -- abas de navegador -------------------------------------------------------
+// Aba nao e janela: o Windows so ve UMA janela do Chrome. E o OCR le a tira de
+// abas cortada na largura da aba, entao o nome do site nunca aparece. Sem a
+// secao ABAS, "entra numa aba do youtube" e impossivel de cumprir.
+
+test('limparNomeAba tira o sufixo do economizador de memoria do Chrome', () => {
+  assert.equal(
+    limparNomeAba('A Internet Morreu - YouTube – Utilização de memória – 195 MB'),
+    'A Internet Morreu - YouTube',
+  )
+  assert.equal(
+    limparNomeAba('Some Video - YouTube – Memory usage – 431 MB'),
+    'Some Video - YouTube',
+  )
+  assert.equal(limparNomeAba('Aba sem sufixo'), 'Aba sem sufixo')
+  assert.equal(limparNomeAba(null), '')
+})
+
+test('ehNavegador cobre os navegadores comuns e nada mais', () => {
+  for (const p of ['chrome', 'Chrome', 'msedge', 'firefox', 'brave']) {
+    assert.ok(ehNavegador(p), `${p} deveria contar como navegador`)
+  }
+  for (const p of ['code', 'notepad', 'explorer', '', null]) {
+    assert.ok(!ehNavegador(p))
+  }
+})
+
+test('formatar publica as abas com o nome inteiro e manda usar clicar_elemento', () => {
+  const texto = formatar(DUAS_TELAS, {
+    grupos: agruparTexto(DUAS_TELAS),
+    maxLinhas: 120,
+    visao: null,
+    monitorFiltro: null,
+    abas: {
+      janela: 'Navegador',
+      lista: [
+        { nome: 'A Internet Morreu - YouTube', x: 517, y: 20 },
+        { nome: 'NerdCast 1046 - Qual é a Pauta? - YouTube', x: 709, y: 20 },
+      ],
+    },
+  })
+  assert.match(texto, /ABAS em "Navegador" \(2\)/)
+  // O nome do site sobrevive aqui, e era isso que faltava: no OCR o titulo
+  // chega cortado em "NerdCast 1046 - Qual" e a palavra YouTube some.
+  assert.match(texto, /"A Internet Morreu - YouTube" em \(517,20\)/)
+  assert.match(texto, /clicar_elemento/)
+  assert.match(texto, /NAO clicar_texto/)
+})
+
+// -- as duas recusas de clique -----------------------------------------------
+// Na sessao session-9932b1ee o agente clicou na propria conversa e, depois de
+// avisado que nao tinha dado certo, repetiu o MESMO clique em (1120,945) seis
+// vezes seguidas com a tela parada.
+
+// A janela do dsh cobrindo o monitor 0, como na sessao medida.
+const COM_JANELA_PROPRIA = [
+  {
+    titulo: 'AI Coding Assistant Session — DeepSeek Harness - Google Chrome',
+    processo: 'chrome', x: -8, y: -8, largura: 2576, altura: 1408,
+    monitor: 0, minimizada: false, em_foco: true, ordem_z: 0,
+  },
+  {
+    titulo: 'Bloco de Notas', processo: 'notepad', x: 2600, y: 100, largura: 400, altura: 300,
+    monitor: 0, minimizada: false, em_foco: false, ordem_z: 1,
+  },
+]
+
+test('recusa clique dentro da janela do proprio dsh', () => {
+  // (1120,945) e a coordenada exata em que o agente clicou seis vezes.
+  const r = motivoParaNaoClicar({ x: 1120, y: 945, janelas: COM_JANELA_PROPRIA })
+  assert.match(r, /NAO CLIQUEI/)
+  assert.match(r, /propria conversa/)
+})
+
+test('deixa passar clique numa janela que nao e a do agente', () => {
+  assert.equal(motivoParaNaoClicar({ x: 2700, y: 200, janelas: COM_JANELA_PROPRIA }), null)
+})
+
+test('sem leitura de tela previa nao ha o que conferir, e o clique passa', () => {
+  assert.equal(motivoParaNaoClicar({ x: 1120, y: 945, janelas: [] }), null)
+})
+
+test('recusa o mesmo clique quando a tela nao mudou desde ele', () => {
+  const r = motivoParaNaoClicar({
+    x: 1120, y: 945, janelas: [], assinatura: 'tela-A',
+    ultimoClique: { chave: 'clicar:1120,945', assinatura: 'tela-A' },
+  })
+  assert.match(r, /ja clicou em \(1120,945\) e a tela continua identica/)
+})
+
+test('se a tela mudou, repetir o clique e legitimo e passa', () => {
+  const r = motivoParaNaoClicar({
+    x: 1120, y: 945, janelas: [], assinatura: 'tela-B',
+    ultimoClique: { chave: 'clicar:1120,945', assinatura: 'tela-A' },
+  })
+  assert.equal(r, null)
+})
+
+test('clique em OUTRA coordenada passa mesmo com a tela parada', () => {
+  const r = motivoParaNaoClicar({
+    x: 500, y: 500, janelas: [], assinatura: 'tela-A',
+    ultimoClique: { chave: 'clicar:1120,945', assinatura: 'tela-A' },
+  })
+  assert.equal(r, null)
+})
+
+// -- a conversa do agente nao conta como "a tela mudou" ----------------------
+// Sem isto a trava de "nada mudou" nunca dispararia no dsh de verdade: cada
+// chamada de ferramenta vira uma linha nova no chat, entao a tela muda sempre.
+
+test('assinaturaDaTela ignora o que muda dentro da janela do proprio agente', () => {
+  const base = {
+    janelas: COM_JANELA_PROPRIA,
+    ocr: [{ monitor: 0, linhas: [
+      // dentro da janela do dsh: o log da conversa, que cresce a cada passo
+      { texto: 'Tool call interagir_tela', x: 1000, y: 1030, w: 300, h: 20 },
+      // dentro do Bloco de Notas: isto sim e o programa sendo controlado
+      { texto: 'conteudo real', x: 2700, y: 200, w: 200, h: 20 },
+    ] }],
+  }
+  const depois = structuredClone(base)
+  depois.ocr[0].linhas[0].texto = 'Tool call analisar_tela — mais uma linha no chat'
+
+  assert.equal(
+    assinaturaDaTela(base),
+    assinaturaDaTela(depois),
+    'o agente falando consigo mesmo não é uma mudança na tela',
+  )
+
+  const mudouDeVerdade = structuredClone(base)
+  mudouDeVerdade.ocr[0].linhas[1].texto = 'outro conteudo'
+  assert.notEqual(assinaturaDaTela(base), assinaturaDaTela(mudouDeVerdade))
 })

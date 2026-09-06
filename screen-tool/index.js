@@ -29,6 +29,104 @@ const MAX_LINHAS_PADRAO = 120
 
 const SEM_JANELA = Symbol('sem janela')
 
+// A janela do PROPRIO agente. Existe porque o dsh roda numa aba do navegador,
+// entao TUDO que o agente escreve e que o usuario digita vira texto NA TELA — e
+// portanto vira alvo de clique. E uma armadilha que se retroalimenta: quanto
+// mais o agente fala em "youtube", mais "youtube" aparece na tela para clicar.
+//
+// Medido na sessao session-9932b1ee (05/09/2026). O usuario pediu "entra em
+// alguma das abas do youtube e da play no video". As abas de YouTube ESTAVAM
+// abertas, mas o OCR corta o titulo delas ("NerdCast 1046 - Qual", "A Intemet
+// Morreu") e a palavra "YouTube" nao sobrevive ao corte. O unico "youtube" na
+// tela era a MENSAGEM DO USUARIO renderizada no chat. O agente clicou nela e
+// anunciou que o video tinha comecado a tocar.
+//
+// O padrao casa com o titulo da janela. Para outro deploy, defina
+// DSH_SCREEN_TOOL_JANELA_PROPRIA com uma expressao regular propria.
+const PADRAO_JANELA_PROPRIA = /deepseek harness/i
+
+function padraoJanelaPropria() {
+  const bruto = process.env.DSH_SCREEN_TOOL_JANELA_PROPRIA
+  if (!bruto) return PADRAO_JANELA_PROPRIA
+  try {
+    return new RegExp(bruto, 'i')
+  } catch {
+    return PADRAO_JANELA_PROPRIA
+  }
+}
+
+export function ehJanelaPropria(janela) {
+  const titulo = typeof janela === 'string' ? janela : janela?.titulo
+  if (!titulo) return false
+  return padraoJanelaPropria().test(String(titulo))
+}
+
+// Reaproveita janelaDaLinha tratando o ponto como uma linha de tamanho zero.
+export function janelaEmPonto(janelas, x, y) {
+  return janelaDaLinha({ x, y, w: 0, h: 0 }, janelas ?? [])
+}
+
+// Assinatura do estado visivel, para responder "mudou alguma coisa desde a
+// ultima leitura?". Nao inclui `capturado_em`: o carimbo de tempo muda sempre e
+// tornaria toda tela diferente da anterior. As linhas vao ordenadas para a
+// comparacao nao depender da ordem em que o OCR devolveu.
+//
+// Um relogio visivel na tela (barra de tarefas, carimbo de mensagem) muda de
+// minuto em minuto e faz a assinatura diferir sem nada ter mudado de verdade.
+// Isso deixa a checagem CONSERVADORA — deixa passar as vezes, nunca acusa
+// mudanca que nao houve — que e o erro certo a cometer aqui.
+// A janela do proprio agente fica DE FORA da assinatura, e isso nao e detalhe:
+// a conversa cresce na tela a cada passo — cada chamada de ferramenta vira uma
+// linha nova no chat — entao a tela literalmente NUNCA fica igual, e a checagem
+// nunca acusaria nada. Medido: duas leituras seguidas, sem tocar em nada,
+// davam assinaturas diferentes so por causa do proprio log do agente.
+//
+// Conceitualmente e o certo tambem: o agente falar consigo mesmo nao e uma
+// mudanca no programa que ele esta tentando controlar.
+export function assinaturaDaTela(dados) {
+  const janelas = (dados?.janelas ?? [])
+    .filter((j) => !ehJanelaPropria(j))
+    .map(
+      (j) =>
+        `${j.titulo}|${j.x},${j.y},${j.largura},${j.altura}` +
+        `|${j.minimizada ? 1 : 0}|${j.em_foco ? 1 : 0}`,
+    )
+  const linhas = (dados?.ocr ?? [])
+    .flatMap((b) => b.linhas ?? [])
+    .filter((l) => !ehJanelaPropria(janelaDaLinha(l, dados?.janelas ?? [])))
+    .map((l) => `${l.x},${l.y},${l.texto}`)
+    .sort()
+  return [...janelas, '--', ...linhas].join('\n')
+}
+
+// O Chrome anexa " – Utilizacao de memoria – 195 MB" ao nome da aba quando o
+// economizador de memoria esta ligado. Esse sufixo muda a cada leitura, entao
+// poluiria tanto a busca por nome quanto a assinatura da tela.
+const SUFIXO_MEMORIA =
+  /\s+[\u2013\u2014-]\s+(Utiliza[\u00e7c][\u00e3a]o de mem[\u00f3o]ria|Memory usage)\s+[\u2013\u2014-].*$/i
+
+export function limparNomeAba(nome) {
+  return String(nome ?? '').replace(SUFIXO_MEMORIA, '').trim()
+}
+
+const PROCESSOS_NAVEGADOR = new Set([
+  'chrome', 'msedge', 'firefox', 'brave', 'opera', 'vivaldi', 'chromium',
+])
+
+export function ehNavegador(processo) {
+  return PROCESSOS_NAVEGADOR.has(String(processo ?? '').toLowerCase())
+}
+
+// Estado entre chamadas, para as duas travas contra laco: "a tela nao mudou" e
+// "voce ja tentou exatamente isso". Vive no modulo porque o plugin e uma
+// instancia por sessao.
+const estado = {
+  assinatura: null,
+  quando: null,
+  janelas: [],
+  ultimoClique: null,
+}
+
 export const name = 'screen-analyzer'
 export const inject = ['tools']
 
@@ -160,12 +258,31 @@ async function descreverComVisao(arquivo, pergunta) {
   return `${texto}\n(imagem custou ${gastou} tokens de ${VISION_NUM_CTX})`
 }
 
-export function formatar(dados, { grupos, maxLinhas, visao, monitorFiltro }) {
+export function formatar(
+  dados,
+  { grupos, maxLinhas, visao, monitorFiltro, semMudancaHa = null, abas = null },
+) {
   const out = []
   const v = dados.area_virtual
 
+  out.push(`=== TELA em ${dados.capturado_em} ===`)
+
+  // Sem isto o modelo recebe a MESMA parede de texto de antes e conclui o que
+  // quiser dela. Na sessao session-9932b1ee ele clicou seis vezes na mesma
+  // coordenada, e depois de cada uma escreveu uma analise afirmando que a tela
+  // tinha mudado. Nada tinha mudado; ele nao tinha como saber, porque ninguem
+  // dizia. Dizer e barato e resolve.
+  if (semMudancaHa != null) {
+    out.push(
+      `ATENCAO: a tela esta IDENTICA a leitura anterior (ha ${Math.round(semMudancaHa / 1000)}s).`,
+      'O que voce fez entre uma leitura e outra NAO teve efeito visivel nenhum.',
+      'Repetir a mesma acao vai dar o mesmo resultado. Mude de caminho:',
+      '  analisar_tela com controles: "<titulo da janela>" lista o que da para',
+      '  clicar de verdade, com o nome real do controle — o OCR corta nome longo.',
+    )
+  }
+
   out.push(
-    `=== TELA em ${dados.capturado_em} ===`,
     `Área virtual: ${v.largura}x${v.altura} a partir de (${v.x},${v.y}); ${dados.monitores.length} monitor(es).`,
     'Todas as coordenadas abaixo são da área virtual, prontas para uso direto.',
     '',
@@ -191,6 +308,23 @@ export function formatar(dados, { grupos, maxLinhas, visao, monitorFiltro }) {
     out.push(`${marca}"${j.titulo}" [${j.processo}] — ${onde}`)
   }
   out.push('  (* = janela em foco)')
+
+  // Aba de navegador nao e janela: o Windows so enxerga UMA janela do Chrome,
+  // com o titulo da aba ativa. As outras abas existem so na arvore de
+  // acessibilidade. E o OCR nao salva: ele le a tira de abas, mas cortada na
+  // largura da aba — "NerdCast 1046 - Qual" — entao o nome do site nunca
+  // aparece. Pedir "entra numa aba do youtube" era impossivel de cumprir sem
+  // esta secao.
+  if (abas && abas.lista.length) {
+    out.push('', `ABAS em "${abas.janela}" (${abas.lista.length})`)
+    for (const a of abas.lista) {
+      out.push(`  "${a.nome}" em (${a.x},${a.y})`)
+    }
+    out.push(
+      '  Para trocar de aba use interagir_tela clicar_elemento com o nome da aba,',
+      '  e NAO clicar_texto: o OCR corta o titulo da aba e nunca acha o nome do site.',
+    )
+  }
 
   const totalLinhas = grupos.reduce((n, g) => n + g.linhas.length, 0)
   out.push('', `TEXTO NA TELA (${totalLinhas} linhas lidas por OCR)`)
@@ -306,6 +440,17 @@ function construirFerramenta(nomeFerramenta) {
       const dados = await inspecionar({ comVisao })
       const grupos = agruparTexto(dados)
 
+      const assinatura = assinaturaDaTela(dados)
+      const igual = estado.assinatura !== null && assinatura === estado.assinatura
+      const semMudancaHa = igual && estado.quando ? Date.now() - estado.quando : null
+      estado.assinatura = assinatura
+      estado.quando = Date.now()
+      // Guardado para a trava de clique saber, sem custar outra leitura de
+      // tela, qual janela esta sob a coordenada que o modelo quer clicar.
+      estado.janelas = dados.janelas ?? []
+
+      const abas = await lerAbas(dados)
+
       let visao = null
       if (comVisao) {
         visao = []
@@ -322,6 +467,8 @@ function construirFerramenta(nomeFerramenta) {
         maxLinhas: MAX_LINHAS_PADRAO,
         visao,
         monitorFiltro,
+        semMudancaHa,
+        abas,
       })
     },
   }
@@ -401,6 +548,33 @@ async function lerElementos(janela) {
   if (Array.isArray(dados.elementos)) return dados
   if (dados.elementos) return { ...dados, elementos: [dados.elementos] }
   return dados
+}
+
+// As abas do navegador, pela arvore de acessibilidade. Custo medido no
+// elements.ps1: ~90ms para achar a janela e ~50ms para varrer.
+//
+// Pega o navegador mais a frente na ordem-Z, e nao a janela em foco: quando o
+// usuario pede "entra numa aba do youtube", quem esta em foco e justamente a
+// janela do dsh, onde ele digitou o pedido. Exigir foco aqui deixaria a secao
+// vazia exatamente na hora em que ela e necessaria.
+async function lerAbas(dados) {
+  const frente = (dados?.janelas ?? [])
+    .filter((j) => !j.minimizada && ehNavegador(j.processo))
+    .sort((a, b) => a.ordem_z - b.ordem_z)[0]
+  if (!frente) return null
+  let el
+  try {
+    el = await lerElementos(frente.titulo)
+  } catch {
+    // Abas sao um extra: se a arvore falhar, a leitura de tela continua valendo.
+    return null
+  }
+  const lista = (el?.elementos ?? [])
+    .filter((e) => e.tipo === 'TabItem')
+    .map((e) => ({ nome: limparNomeAba(e.nome), x: e.x, y: e.y }))
+    .filter((e) => e.nome)
+  if (!lista.length) return null
+  return { janela: el.janela ?? frente.titulo, lista }
 }
 
 // Casa por AutomationId exato primeiro: é o identificador estável, e não muda
@@ -591,7 +765,30 @@ async function clicarEmTexto(args) {
 
   const dados = await inspecionar({ comVisao: false })
   const filtro = typeof args?.janela_esperada === 'string' ? args.janela_esperada.trim() : ''
-  const achados = acharTexto(dados, procurado, filtro)
+  const todosAchados = acharTexto(dados, procurado, filtro)
+
+  // O texto que o proprio agente escreveu esta na tela e casa com a busca. Se
+  // sobrar so isso, clicar seria conversar com o proprio reflexo — foi
+  // exatamente o que aconteceu na sessao session-9932b1ee. Separar em vez de
+  // filtrar em silencio: o modelo precisa entender POR QUE nao clicou, senao
+  // tenta de novo com outra palavra e cai na mesma armadilha.
+  const proprios = todosAchados.filter((a) => ehJanelaPropria(a.janela))
+  const achados = todosAchados.filter((a) => !ehJanelaPropria(a.janela))
+
+  if (achados.length === 0 && proprios.length > 0) {
+    return [
+      `NAO CLIQUEI. As ${proprios.length} ocorrencias de "${procurado}" na tela estao`,
+      `todas dentro de "${proprios[0].janela?.titulo ?? 'janela do agente'}" — que e a`,
+      'janela do PROPRIO dsh. Isso e a sua conversa aparecendo na tela, nao o alvo:',
+      'a mensagem do usuario e as suas proprias respostas viram texto clicavel.',
+      '',
+      'Clicar ali nao faz nada no programa que voce quer controlar.',
+      'Para agir de verdade:',
+      '  1. analisar_tela — veja a secao ABAS e a lista de janelas.',
+      '  2. analisar_tela com controles: "<titulo da janela>" — nomes reais dos controles.',
+      '  3. interagir_tela clicar_elemento com esse nome.',
+    ].join('\n')
+  }
 
   if (achados.length === 0) {
     // Devolver vizinhança ajuda mais que só dizer "não achei": quase sempre o
@@ -665,9 +862,61 @@ export function montarArgumentos(args) {
   return { acao, ps, semConfirmacao }
 }
 
+// As duas recusas de clique, isoladas do resto para poderem ser testadas sem
+// mover o mouse de ninguem. Devolve o texto da recusa, ou null para deixar
+// passar. `janelas` e `assinatura` vem da ultima leitura de tela — que e
+// justamente o que o modelo olhou para escolher a coordenada.
+export function motivoParaNaoClicar({ x, y, janelas, assinatura, ultimoClique }) {
+  // 1) Clicar na propria conversa. Mesma razao do clicar_texto, agora para
+  // coordenada crua: depois que o clicar_texto recusa, o caminho seguinte do
+  // modelo e pegar o x/y de um dos candidatos e clicar direto. Na sessao
+  // session-9932b1ee foi assim que ele acertou a propria mensagem do usuario.
+  // Sem leitura de tela previa nao ha o que conferir, e o clique passa.
+  const alvo = janelaEmPonto(janelas, x, y)
+  if (alvo && ehJanelaPropria(alvo)) {
+    return [
+      `NAO CLIQUEI. (${x},${y}) cai dentro de "${alvo.titulo}", que e a janela do`,
+      'PROPRIO dsh — voce estaria clicando na sua propria conversa, e nao no',
+      'programa que quer controlar.',
+      'Veja a secao ABAS e a lista de JANELAS da ultima leitura, escolha o alvo',
+      'certo, e prefira: analisar_tela com controles: "<janela>" e clicar_elemento.',
+    ].join('\n')
+  }
+
+  // 2) Laco. Dispara so quando as DUAS coisas valem: e exatamente o mesmo
+  // clique, e a tela esta como estava quando ele foi dado. Se a tela mudou,
+  // repetir pode ser legitimo e passa. Na sessao medida o mesmo clique em
+  // (1120,945) saiu seis vezes seguidas com a tela parada.
+  if (
+    ultimoClique &&
+    ultimoClique.chave === `clicar:${x},${y}` &&
+    assinatura != null &&
+    ultimoClique.assinatura === assinatura
+  ) {
+    return [
+      `NAO CLIQUEI. Voce ja clicou em (${x},${y}) e a tela continua identica.`,
+      'O mesmo clique vai dar o mesmo resultado: nenhum.',
+      'Pare de repetir e mude de abordagem:',
+      '  analisar_tela com controles: "<titulo da janela>" da o nome real do',
+      '  controle, e clicar_elemento acerta o alvo que a coordenada erra.',
+      'Se nao souber como seguir, pergunte ao usuario com ask_user_question.',
+    ].join('\n')
+  }
+
+  return null
+}
+
 async function executarAcao(args) {
   const { acao, ps, semConfirmacao } = montarArgumentos(args)
   if (!acao) return 'Erro: informe a ação (mover, clicar, digitar, teclas, rolar).'
+
+  if (acao === 'clicar' && Number.isFinite(args?.x) && Number.isFinite(args?.y)) {
+    const x = Math.round(args.x)
+    const y = Math.round(args.y)
+    const recusa = motivoParaNaoClicar({ x, y, ...estado })
+    if (recusa) return recusa
+    estado.ultimoClique = { chave: `clicar:${x},${y}`, assinatura: estado.assinatura }
+  }
 
   let saida
   try {
