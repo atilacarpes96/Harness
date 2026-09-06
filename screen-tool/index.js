@@ -109,6 +109,21 @@ export function limparNomeAba(nome) {
   return String(nome ?? '').replace(SUFIXO_MEMORIA, '').trim()
 }
 
+// O Chrome escreve "audio em reproducao" no NOME da aba enquanto ela toca som,
+// e tira quando pausa. Isso resolve a pergunta que o agente nao conseguia
+// responder de jeito nenhum: "o play funcionou?".
+//
+// Medido na sessao session-7ceeaf4e: ele clicou no player, nao soube dizer se
+// tinha tocado, clicou de novo — e ficou pausando e despausando o video. Estava
+// tentando julgar isso por OCR e por um modelo de visao de 4B olhando um frame
+// parado, que e justamente o que nao da para fazer: video pausado e video
+// tocando sao a mesma imagem num instante qualquer.
+const MARCA_TOCANDO = /[–—-]\s*(áudio em reprodução|audio playing|playing)/i
+
+export function abaTocando(nome) {
+  return MARCA_TOCANDO.test(String(nome ?? ''))
+}
+
 const PROCESSOS_NAVEGADOR = new Set([
   'chrome', 'msedge', 'firefox', 'brave', 'opera', 'vivaldi', 'chromium',
 ])
@@ -124,6 +139,7 @@ const estado = {
   assinatura: null,
   quando: null,
   janelas: [],
+  abas: null,
   ultimoClique: null,
 }
 
@@ -324,6 +340,12 @@ export function formatar(
       '  Para trocar de aba use interagir_tela clicar_elemento com o nome da aba,',
       '  e NAO clicar_texto: o OCR corta o titulo da aba e nunca acha o nome do site.',
     )
+    if (abas.lista.some((a) => abaTocando(a.nome))) {
+      out.push(
+        '  A aba marcada "audio em reproducao" ESTA tocando agora. Use isso para',
+        '  conferir se o play funcionou — a imagem da tela nao responde isso.',
+      )
+    }
   }
 
   const totalLinhas = grupos.reduce((n, g) => n + g.linhas.length, 0)
@@ -450,6 +472,7 @@ function construirFerramenta(nomeFerramenta) {
       estado.janelas = dados.janelas ?? []
 
       const abas = await lerAbas(dados)
+      estado.abas = abas
 
       let visao = null
       if (comVisao) {
@@ -569,8 +592,17 @@ async function lerAbas(dados) {
     // Abas sao um extra: se a arvore falhar, a leitura de tela continua valendo.
     return null
   }
+  // Nem todo TabItem e aba do navegador: a propria PAGINA usa TabItem para os
+  // seus proprios controles. Medido ao vivo numa aba do YouTube, a arvore
+  // devolvia "Todos", "Relacionados" e "Enviados recentemente" — chips DENTRO
+  // do video — misturados com as 12 abas de verdade. Publicar isso mandaria o
+  // modelo tentar "trocar para a aba Relacionados".
+  //
+  // A tira de abas fica colada no topo da janela; controle de pagina, nao. 80px
+  // cobre a tira inteira (41px de altura) com folga, e nada abaixo dela.
+  const limiteTira = (frente.y ?? 0) + 80
   const lista = (el?.elementos ?? [])
-    .filter((e) => e.tipo === 'TabItem')
+    .filter((e) => e.tipo === 'TabItem' && e.y < limiteTira)
     .map((e) => ({ nome: limparNomeAba(e.nome), x: e.x, y: e.y }))
     .filter((e) => e.nome)
   if (!lista.length) return null
@@ -790,6 +822,28 @@ async function clicarEmTexto(args) {
     ].join('\n')
   }
 
+  // O filtro `janela_esperada` pode ter comido tudo. Isso ficava invisivel: a
+  // resposta dizia "Nao encontrei X na tela" e logo abaixo listava o proprio X
+  // em "textos parecidos" — contraditorio, e mandava o modelo caçar erro de OCR
+  // que nao existia. Medido na sessao session-7ceeaf4e: 4 buscas assim, todas
+  // porque ele passou o nome da ABA em janela_esperada, e nenhuma janela tem
+  // esse titulo.
+  if (achados.length === 0 && filtro) {
+    const semFiltro = acharTexto(dados, procurado, '').filter((a) => !ehJanelaPropria(a.janela))
+    if (semFiltro.length) {
+      const dica = dicaDeAba(filtro, estado.abas)
+      return [
+        `Nao cliquei. "${procurado}" ESTA na tela, mas nenhuma ocorrencia fica dentro`,
+        `de uma janela cujo titulo contenha "${filtro}" — e esse foi o seu filtro.`,
+        'Onde o texto realmente esta:',
+        ...semFiltro
+          .slice(0, 6)
+          .map((a) => `  (${a.x},${a.y}) em "${a.janela?.titulo ?? 'fora de janela'}" — ${a.texto}`),
+        dica ? `\n${dica}` : 'Repita sem janela_esperada, ou com parte do titulo de uma janela acima.',
+      ].join('\n')
+    }
+  }
+
   if (achados.length === 0) {
     // Devolver vizinhança ajuda mais que só dizer "não achei": quase sempre o
     // texto está lá com uma letra trocada pelo OCR.
@@ -862,6 +916,42 @@ export function montarArgumentos(args) {
   return { acao, ps, semConfirmacao }
 }
 
+// Aba nao e janela, e o modelo insiste em tratar como se fosse: manda `focar`
+// ou `janela_esperada` com o nome da ABA. Isso nunca casa com titulo de janela
+// nenhum, e ele repete ate desistir.
+//
+// Medido na sessao session-7ceeaf4e: 14 chamadas de `focar` com nome de aba,
+// mais 4 cliques abortados pelo mesmo motivo — o erro dominante da sessao. Pior
+// que o desperdicio: a mensagem que ele recebia no clique era "a tela mudou
+// entre perceber e agir", que aponta para a causa errada. A tela nao tinha
+// mudado; ele e que tinha nomeado uma aba onde se pede uma janela.
+//
+// Devolve a dica pronta, com a coordenada do centro da aba, ou null.
+export function dicaDeAba(nome, abas) {
+  const alvo = normalizar(nome)
+  if (alvo.length < 4 || !abas?.lista?.length) return null
+
+  const casa = abas.lista.filter((a) => {
+    const n = normalizar(a.nome)
+    return n.includes(alvo) || alvo.includes(n)
+  })
+  if (!casa.length) return null
+
+  return [
+    `"${nome}" nao e uma JANELA — e uma ABA do navegador.`,
+    'Aba nao tem janela propria: o Windows enxerga UMA janela do navegador, com o',
+    'titulo da aba ativa. Por isso focar por nome de aba nunca vai funcionar.',
+    'Para trocar de aba, CLIQUE nela — a coordenada ja e o centro da aba:',
+    ...casa
+      .slice(0, 5)
+      .map(
+        (a) =>
+          `  interagir_tela clicar x=${a.x} y=${a.y} ` +
+          `janela_esperada="${abas.janela}"   -> "${a.nome}"`,
+      ),
+  ].join('\n')
+}
+
 // As duas recusas de clique, isoladas do resto para poderem ser testadas sem
 // mover o mouse de ninguem. Devolve o texto da recusa, ou null para deixar
 // passar. `janelas` e `assinatura` vem da ultima leitura de tela — que e
@@ -906,9 +996,28 @@ export function motivoParaNaoClicar({ x, y, janelas, assinatura, ultimoClique })
   return null
 }
 
+// As acoes que a camada de controle (act.ps1) entende. As outras — as que
+// resolvem no JS — sao despachadas antes de chegar aqui.
+const ACOES_DO_CONTROLE = new Set([
+  'mover', 'clicar', 'digitar', 'teclas', 'rolar', 'focar',
+])
+
 async function executarAcao(args) {
   const { acao, ps, semConfirmacao } = montarArgumentos(args)
   if (!acao) return 'Erro: informe a ação (mover, clicar, digitar, teclas, rolar).'
+
+  // Sem isto uma acao inventada vazava o erro cru do PowerShell, em portugues
+  // com acento quebrado e citando o caminho do act.ps1 — ilegivel para o modelo
+  // e sem dizer o que fazer. Visto na sessao session-7ceeaf4e com
+  // acao: "ver_tela", que e o nome da OUTRA ferramenta.
+  if (!ACOES_DO_CONTROLE.has(acao)) {
+    return [
+      `Não existe a ação "${acao}" em interagir_tela.`,
+      'Ações válidas: clicar_elemento, ler_elemento, clicar_texto, esperar,',
+      'focar, mover, clicar, digitar, teclas, rolar.',
+      'Para OBSERVAR a tela use a outra ferramenta, analisar_tela — não é uma ação daqui.',
+    ].join('\n')
+  }
 
   if (acao === 'clicar' && Number.isFinite(args?.x) && Number.isFinite(args?.y)) {
     const x = Math.round(args.x)
@@ -939,7 +1048,12 @@ async function executarAcao(args) {
     return `Resposta ilegível da camada de controle: ${String(saida).slice(0, 400)}`
   }
 
-  if (dados.erro) return `AÇÃO NÃO REALIZADA. ${dados.erro}`
+  if (dados.erro) {
+    const dica = dicaDeAba(args?.janela_esperada, estado.abas)
+    return dica
+      ? `AÇÃO NÃO REALIZADA. ${dados.erro}\n\n${dica}`
+      : `AÇÃO NÃO REALIZADA. ${dados.erro}`
+  }
 
   if (semConfirmacao) {
     return [

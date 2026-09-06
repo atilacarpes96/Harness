@@ -16,9 +16,11 @@ import {
   acharElemento,
   acharTexto,
   agruparTexto,
+  abaTocando,
   assinaturaDaTela,
   ehJanelaPropria,
   ehNavegador,
+  dicaDeAba,
   formatar,
   janelaDaLinha,
   janelaEmPonto,
@@ -627,4 +629,72 @@ test('assinaturaDaTela ignora o que muda dentro da janela do proprio agente', ()
   const mudouDeVerdade = structuredClone(base)
   mudouDeVerdade.ocr[0].linhas[1].texto = 'outro conteudo'
   assert.notEqual(assinaturaDaTela(base), assinaturaDaTela(mudouDeVerdade))
+})
+
+// -- aba nao e janela --------------------------------------------------------
+// O erro DOMINANTE da sessao session-7ceeaf4e: 14 chamadas de `focar` com nome
+// de aba, mais 4 cliques abortados pelo mesmo motivo. E a mensagem que o modelo
+// recebia no clique — "a tela mudou entre perceber e agir" — apontava para a
+// causa errada.
+
+const ABAS_CHROME = {
+  janela: 'NerdCast 1046 - Qual é a Pauta? - YouTube - Google Chrome',
+  lista: [
+    { nome: 'A Internet Morreu - YouTube', x: 517, y: 20 },
+    { nome: '(7) NerdCast 1046 - Qual é a Pauta? Filmes Caseiros - YouTube', x: 709, y: 20 },
+  ],
+}
+
+test('dicaDeAba reconhece o nome parcial de aba que o modelo usou', () => {
+  // "NerdCast 1046" foi exatamente o que ele mandou em janela_esperada.
+  const d = dicaDeAba('NerdCast 1046', ABAS_CHROME)
+  assert.match(d, /nao e uma JANELA — e uma ABA/)
+  assert.match(d, /clicar x=709 y=20/, 'precisa entregar a coordenada pronta')
+  assert.match(d, /janela_esperada="NerdCast 1046 - Qual é a Pauta\? - YouTube - Google Chrome"/)
+})
+
+test('dicaDeAba casa tambem quando o modelo manda o titulo inteiro da aba', () => {
+  const d = dicaDeAba('(7) NerdCast 1046 - Qual é a Pauta? Filmes Caseiros - YouTube', ABAS_CHROME)
+  assert.match(d, /clicar x=709 y=20/)
+})
+
+test('dicaDeAba fica calada quando nao ha aba parecida', () => {
+  assert.equal(dicaDeAba('Bloco de Notas', ABAS_CHROME), null)
+  assert.equal(dicaDeAba('NerdCast 1046', null), null, 'sem leitura de tela não há dica')
+  assert.equal(dicaDeAba('ok', ABAS_CHROME), null, 'nome curto demais casaria com qualquer coisa')
+})
+
+// -- "o play funcionou?" -----------------------------------------------------
+// A pergunta que o agente nao conseguia responder, e que o fez ficar pausando e
+// despausando o video na sessao session-7ceeaf4e. Video pausado e video tocando
+// sao a mesma imagem num frame parado; o Chrome, porem, escreve no NOME da aba.
+
+test('abaTocando reconhece a marca que o Chrome poe na aba', () => {
+  assert.ok(abaTocando('(7) A Internet Morreu - YouTube – áudio em reprodução'))
+  assert.ok(abaTocando('Some Video - YouTube - audio playing'))
+  assert.ok(!abaTocando('(7) NerdCast 1046 - Qual é a Pauta? - YouTube'))
+  assert.ok(!abaTocando(null))
+})
+
+test('formatar aponta a aba que esta tocando, e cala quando nenhuma esta', () => {
+  const com = formatar(DUAS_TELAS, {
+    grupos: agruparTexto(DUAS_TELAS), maxLinhas: 120, visao: null, monitorFiltro: null,
+    abas: { janela: 'Chrome', lista: [
+      { nome: 'A Internet Morreu - YouTube – áudio em reprodução', x: 562, y: 20 },
+    ] },
+  })
+  assert.match(com, /ESTA tocando agora/)
+
+  const sem = formatar(DUAS_TELAS, {
+    grupos: agruparTexto(DUAS_TELAS), maxLinhas: 120, visao: null, monitorFiltro: null,
+    abas: { janela: 'Chrome', lista: [{ nome: 'NerdCast 1046 - YouTube', x: 709, y: 20 }] },
+  })
+  assert.ok(!/ESTA tocando agora/.test(sem))
+})
+
+test('limparNomeAba preserva a marca de audio e tira so o uso de memoria', () => {
+  assert.equal(
+    limparNomeAba('A Internet Morreu - YouTube – áudio em reprodução – Utilização de memória – 195 MB'),
+    'A Internet Morreu - YouTube – áudio em reprodução',
+  )
 })
