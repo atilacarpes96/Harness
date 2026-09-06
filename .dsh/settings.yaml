@@ -81,10 +81,6 @@ llm-pi-ai:
             - text
           maxTokens: 131072
           name: minimax-m3:cloud
-        - id: gemma4:26b
-          input:
-            - text
-          name: gemma4:26b
         - contextWindow: 128000
           id: critico-cpu:latest
           input:
@@ -108,6 +104,15 @@ llm-pi-ai:
           input:
             - text
           name: tradutor-cpu:latest
+      # NAO APAGUE `qwen3.5:4b` do Ollama. Ele nao aparece nesta lista de
+      # proposito: nao e rota de agente, e o modelo de visao chamado direto
+      # pelo codigo (`VISION_MODEL` em screen-tool/index.js, usado quando
+      # analisar_tela recebe `visao: true`). Numa limpeza feita so por esta
+      # lista ele pareceria orfao — e nao e.
+      #
+      # Mesma armadilha, do outro lado: `critico-cpu`, `critico-v83-cpu` e
+      # `tradutor-cpu` sao usados pelos workflows do ComfyUI, fora deste
+      # projeto. Ver harness-bench/results/limpeza-modelos-2026-09-06.md.
       displayName: Ollama
       apiKeyEnv: OLLAMA_LAUNCH_DSH_API_KEY
       api: openai-completions
