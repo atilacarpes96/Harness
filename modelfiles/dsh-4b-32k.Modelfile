@@ -1,0 +1,35 @@
+# qwen3-vl:4b-instruct com contexto de 32k. Substitui o dsh-4b:16k como padrao.
+#
+# Por que 32k e nao 16k: o teto de 16384 foi um chute conservador de VRAM, nao
+# uma medida. O contexto NATIVO do qwen3-vl:4b-instruct e 262144
+# (`qwen3vl.context_length` no /api/show). Medido em 05/09/2026 nesta placa
+# (RTX 4070 Ti, 12282 MiB), carregando e lendo /api/ps:
+#
+#   num_ctx 16384 ->  5,5 GB   100% na VRAM
+#   num_ctx 32768 ->  7,9 GB   100% na VRAM   <- aqui
+#   num_ctx 49152 -> 11,1 GB   1,3 GB vaza pra CPU
+#   num_ctx 65536 -> 13,4 GB   3,7 GB vaza pra CPU
+#
+# Ou seja: dobrar o contexto e de graca. Mesma velocidade (7.600 tok/s de
+# prompt eval, 118 tok/s de geracao), mesmo modelo, zero offload pra CPU.
+#
+# Por que isso importa mais que trocar de modelo: compactacao NAO encolhe
+# system prompt nem schemas de ferramenta. O que sobra pra compactar e
+#
+#   gatilho - prefixo fixo - cauda retida
+#
+# e com 16384 isso dava 440 tokens no preset `standard` (medido na sessao
+# session-aeda6325: 62 compactacoes em 45 passos, ~40 falhando com "summary is
+# not smaller than the shadowed content"). A 32768 vira ~10.700 no `standard`
+# e ~18.500 no `enxuto`. O modelo nunca foi o gargalo: o contexto era.
+#
+# Comparado com as alternativas medidas no mesmo dia:
+#   qwen3.6:latest (36B MoE, 262k nativo) da 114 tok/s de prompt e 32 tok/s de
+#   geracao, com 51 s de load frio, porque 23,9 GB nao cabem em 12,3 GB de
+#   VRAM. E acertou a mesma pergunta que este 4B acertou. Nao compensa.
+#   As rotas cloud (glm-5.2, minimax-m3) exigem assinatura paga do Ollama.
+#
+#   ollama create dsh-4b:32k -f modelfiles/dsh-4b-32k.Modelfile
+
+FROM qwen3-vl:4b-instruct
+PARAMETER num_ctx 32768

@@ -1,0 +1,31 @@
+# qwen3.6:latest (36B MoE, familia qwen35moe) com contexto de 32k.
+#
+# Rota OPCIONAL, nao o padrao. O padrao e dsh-4b:32k.
+#
+# Contexto nativo do modelo: 262144. Aqui fica em 32768 porque o gargalo nao e
+# o contexto, e a VRAM: sao 23,9 GB (Q4_K_M) contra 12,3 GB de placa, entao
+# boa parte roda na CPU de qualquer jeito.
+#
+# Medido em 05/09/2026 (RTX 4070 Ti + 31,9 GB de RAM), contra dsh-4b:32k:
+#
+#                    prompt eval   geracao   load frio
+#   dsh-4b:32k        7.631 tok/s  118 tok/s     5 s     100% VRAM
+#   qwen3.6             114 tok/s   32 tok/s    51 s     vaza pra RAM
+#
+# Na pergunta de compreensao do benchmark os dois ACERTARAM. O 36B nao provou
+# ganho de acerto ali; ele existe aqui para a tarefa que o 4B nao der conta,
+# nao como escolha padrao.
+#
+# Thinking: o modelo tem `thinking` em capabilities e renderer/parser qwen3.5
+# (NAO e a familia qwen3-vl-thinking que travava - ver
+# harness-bench/results/ e o Modelfile do dsh-4b-16k). Com thinking ligado ele
+# gastou 1.331 tokens de geracao (4.562 chars de raciocinio) para responder 4
+# linhas, 42,5 s. Com `think: false`: 45 tokens, 28,1 s, mesma resposta certa.
+# Por isso a entrada no settings.yaml declara `reasoningEfforts` com "off" e
+# `compat: {thinkingFormat: qwen}`, que manda o enable_thinking nativo do
+# Ollama em vez do reasoning_effort generico do estilo OpenAI.
+#
+#   ollama create dsh-36b:32k -f modelfiles/dsh-36b-32k.Modelfile
+
+FROM qwen3.6:latest
+PARAMETER num_ctx 32768

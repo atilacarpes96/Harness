@@ -69,20 +69,121 @@
     compaction: true
     toolResultPruner: true
   config:
+    # Os padrões (thresholdRatio 0.8 / retainRatio 0.16) são proporções do
+    # contexto TOTAL, e compactação não encolhe system prompt nem ferramentas.
+    # Num modelo local isso não sobra nada. Medido na sessão
+    # session-aeda6325 (dsh-4b:16k, preset `standard`, 30 ferramentas):
+    #
+    #   contexto ................................. 16.384
+    #   prefixo fixo (system 1.757 + tools 8.287) ~10.044   (61%)
+    #   gatilho 0.8 .............................. 13.107
+    #   cauda retida 0.16 ......................... 2.621
+    #   janela realmente compactável .............. ~440 tokens
+    #
+    # Resultado: 62 compactações em 45 passos, ~40 falhando com "summary is
+    # not smaller than the shadowed content". O agente passou a sessão
+    # compactando 440 tokens em vez de trabalhar, e leu um arquivo de 372
+    # linhas em 38 chamadas de 10 linhas.
+    #
+    # O topo fica no padrão de propósito: ele também vale para as rotas de
+    # contexto grande (claude-*), onde reter 16% é o certo. Só as rotas locais
+    # ganham orçamento ABSOLUTO abaixo.
+    #
+    # `summarizationProvider`/`summarizationModel` ficam VAZIOS de propósito:
+    # o resumo é escrito pelo próprio modelo da rota. Os resumos-lixo da
+    # sessão medida (que copiavam os colchetes do template, tipo
+    # "[the single next action, ...]") não eram incapacidade do 4B — era não
+    # haver nada para resumir. Testado em 05/09/2026 com uma região real de
+    # 3.933 tokens: o qwen3-vl:4b-instruct produziu checkpoint correto, com
+    # paths exatos e o pedido do usuário verbatim, em 7,7 s. O dsh-8b:12k
+    # levou 11,0 s para um resultado equivalente. Não vale a dependência.
     - id: compaction-basic
       name: '@deepseek-ai/dsh-compaction-basic'
+      config:
+        modelPolicies:
+          # O padrão. 32.768 de contexto, gatilho 0.82 = 26.870, sobrando
+          # 5.898 acima dele para os 4096 de `maxTokens` da rota.
+          # Janela compactável: 26.870 - 5.300 (prefixo `enxuto`) - 6.144
+          # = ~15.400 tokens. Contra os 440 da sessão medida.
+          - provider: ollama
+            model: dsh-4b:32k
+            thresholdRatio: 0.82
+            retainTokens: 6144
+            maxTokens: 1024
+
+          # 16.384 de contexto. Gatilho 0.82 = 13.435, deixando 2.949 acima
+          # dele — mais que o `maxTokens: 2048` da rota, então a resposta cabe
+          # sem estourar o num_ctx (a sessão medida chegou a 16.379/16.384).
+          # Com o preset `enxuto` o prefixo cai para ~5.300, então sobram
+          # ~5.100 tokens compactáveis: 12x o que havia.
+          - provider: ollama
+            model: dsh-4b:16k
+            thresholdRatio: 0.82
+            retainTokens: 3072
+            maxTokens: 1024
+
+          # 12.288 de contexto: gatilho 0.80 = 9.830, deixa 2.458 acima.
+          - provider: ollama
+            model: dsh-8b:12k
+            thresholdRatio: 0.8
+            retainTokens: 2048
+            maxTokens: 1024
 
     - id: command-compact
       name: '@deepseek-ai/dsh-command-compact'
 
+    # 8192/4096 cortava a leitura de um arquivo de ~10 KB, que é justamente o
+    # tamanho que PRECISA passar inteiro para o agente entender um plugin.
+    # 12288/8192 deixa um fonte típico chegar intacto e ainda cabe na janela
+    # compactável de ~5.100 tokens.
     - id: tool-result-pruner
       name: '@deepseek-ai/dsh-compaction-tool-result-pruner'
       config:
-        thresholdChars: 8192
-        headChars: 4096
-        tailChars: 1024
+        thresholdChars: 12288
+        headChars: 8192
+        tailChars: 2048
+
+# ── delegação ───────────────────────────────────────────────────────────────
+#
+# Devolvido ao preset em 05/09/2026, junto com a mudança para `dsh-4b:32k`.
+#
+# Por que voltou: a sessão session-aeda6325 é o caso de uso exato. O usuário
+# pediu "analisa a pasta e me diz se tu entende como funciona", e o agente
+# tentou ler a pasta inteira DENTRO do próprio contexto — 38 leituras de 10
+# linhas, e no fim respondeu sobre um arquivo só. Com `subagent` o padrão
+# certo é delegar: o filho lê tudo no contexto DELE e devolve só o resumo.
+# É a única forma de fazer trabalho cujo contexto intermediário não cabe.
+#
+# Custo medido: ~1.080 tokens de prefixo (subagent 361, todo_write 345,
+# interrupt_agent 181, send_message 192). A 32.768 de contexto isso deixa
+# ~14.300 tokens compactáveis, contra ~15.400 sem eles. Vale a troca; a
+# 16.384 não valeria, e era por isso que tinham saído.
+#
+# Copiado do preset `standard`, não escrito do zero: o registro `subagents` é
+# singleton do HOST e o preset contribui só as FERRAMENTAS que o resolvem.
+# `list_agents` (327 tok) fica de fora — o pai conhece os ids que ele mesmo
+# criou. `workflow`, `ralph` e `subagent_fork` também ficam de fora: são
+# 1.596 tokens para orquestração multi-agente que este harness não faz.
+# `isolate: {workflowEngine: true}` do standard não é copiado porque só
+# existe para os workflows, que não estão aqui.
+
+- id: tool-subagent-control
+  name: '@deepseek-ai/dsh-tool-subagent-control'
+
+- id: tool-subagent
+  name: '@deepseek-ai/dsh-tool-subagent'
+  config:
+    provider: spawn
+    toolName: subagent
+    modelSelectionSettings: true
+    backgroundMode: continuable
 
 # ── restante ────────────────────────────────────────────────────────────────
 
 - id: tool-ask-user
   name: '@deepseek-ai/dsh-tool-ask-user'
+
+- id: tool-todo
+  name: '@deepseek-ai/dsh-tool-todo'
+  config:
+    allowParallelInProgress: true
