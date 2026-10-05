@@ -1,0 +1,11 @@
+# qwen3.5:9b com contexto de 32k. Candidato a padrao quando precisao vale mais
+# que rapidez (pedido do usuario em 04/10/2026, depois do teste em que o 4B
+# misturava o texto de uma janela na descricao de outra).
+#
+# Medidas de VRAM e a comparacao com o dsh-4b:32k ficam em
+# harness-bench/results/9b-vs-4b-2026-10-04.md.
+#
+#   ollama create dsh-9b:32k -f modelfiles/dsh-9b-32k.Modelfile
+
+FROM qwen3.5:9b
+PARAMETER num_ctx 32768
