@@ -1,0 +1,16 @@
+# qwen3.5:9b com contexto de 64k. Candidato a padrao quando precisao vale mais
+# que rapidez (pedido do usuario em 04/10/2026, depois do teste em que o 4B
+# misturava o texto de uma janela na descricao de outra).
+#
+# Medidas de VRAM e a comparacao com o dsh-4b:32k ficam em
+# harness-bench/results/9b-vs-4b-2026-10-04.md.
+#
+# Era 32k. Subiu para 64k em 04/10/2026: o agente leu o banco de notificacoes
+# (~13k tokens) e uma RT inteira (~9k) por cima do prefixo fixo (~10k),
+# compactou e esqueceu a tarefa. VRAM medida via /api/ps:
+#   32k -> 6,6 GB   64k -> 7,7 GB (tudo na GPU)   128k -> 10,7 GB (1 GB vaza)
+#
+#   ollama create dsh-9b:64k -f modelfiles/dsh-9b-64k.Modelfile
+
+FROM qwen3.5:9b
+PARAMETER num_ctx 65536
