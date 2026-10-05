@@ -17,8 +17,10 @@ const SAIDA_DIR = join(tmpdir(), 'dsh-screen-tool')
 // medido no qwen3.5:4b: 1024px=596, 1280px=940, 1920px=2060, 2560px=3620.
 // A versao anterior mandava a tela inteira (3620) dentro de num_ctx 4096 e
 // sobravam ~245 tokens para a resposta — dai a descricao vaga e o texto lido
-// errado. Aqui o modelo so precisa julgar layout, entao 1024 basta.
-const VISION_WIDTH = 1024
+// errado. Aqui o modelo so precisa julgar layout. Era 1024; em 04/10/2026 o
+// usuario pediu precisao acima de rapidez e passou a 1280 (940 tokens, ainda
+// com ~3k de folga no num_ctx 4096).
+const VISION_WIDTH = 1280
 const VISION_MODEL = 'qwen3.5:4b'
 const VISION_NUM_CTX = 4096
 const OLLAMA_URL = 'http://127.0.0.1:11434/api/chat'
@@ -325,6 +327,13 @@ export function formatar(
   const v = dados.area_virtual
 
   out.push(`=== TELA em ${dados.capturado_em} ===`)
+  // Na sessao de 04/10/2026 o modelo respondeu "o que ta aparecendo agora"
+  // reciclando uma leitura de um minuto antes, e misturou o texto de uma janela
+  // na descricao de outra. As duas linhas abaixo dizem isso na cara dele.
+  out.push(
+    'Esta leitura vale só para este instante; para outra pergunta sobre a tela, chame de novo.',
+    'O texto de cada janela está no grupo dela: não atribua a uma janela texto de outro grupo.',
+  )
 
   // Sem isto o modelo recebe a MESMA parede de texto de antes e conclui o que
   // quiser dela. Na sessao session-9932b1ee ele clicou seis vezes na mesma
@@ -359,12 +368,20 @@ export function formatar(
     (j) => monitorFiltro == null || j.monitor === monitorFiltro || j.minimizada,
   )
   if (janelasVisiveis.length === 0) out.push('  (nenhuma)')
+  // Janela aberta mas sem nenhuma linha de OCR esta coberta por outra (ou e
+  // so imagem). Em 04/10/2026 o terminal do DSHARNESS estava inteiro atras do
+  // Chrome maximizado, e o modelo descreveu "logs" nele com frases copiadas da
+  // janela do Claude. Dizer que nao ha nada visivel ali corta a invencao.
+  const comTexto = new Set(grupos.filter((g) => g.janela).map((g) => g.janela.ordem_z))
   for (const j of janelasVisiveis) {
     const marca = j.em_foco ? '* ' : '  '
     const onde = j.minimizada
       ? 'MINIMIZADA (sem posição na tela)'
       : `monitor ${j.monitor} em (${j.x},${j.y}) ${j.largura}x${j.altura}`
-    out.push(`${marca}"${j.titulo}" [${j.processo}] — ${onde}`)
+    const coberta = !j.minimizada && !comTexto.has(j.ordem_z)
+      ? ' — COBERTA: nenhum texto dela aparece na tela; não descreva o conteúdo dela'
+      : ''
+    out.push(`${marca}"${j.titulo}" [${j.processo}] — ${onde}${coberta}`)
   }
   out.push('  (* = janela em foco)')
 
@@ -421,6 +438,17 @@ export function formatar(
     const titulo = g.janela
       ? `dentro de "${g.janela.titulo}"`
       : 'fora de qualquer janela (área de trabalho, barra de tarefas)'
+    // A janela do proprio dsh mostra as respostas antigas do modelo. Em
+    // 04/10/2026, com ela na frente, o modelo leu pelo OCR a descricao que ele
+    // mesmo tinha dado um minuto antes e a repetiu como se fosse a tela de
+    // agora — com o mesmo erro de digitacao. O texto dela nao entra.
+    if (ehJanelaPropria(g.janela)) {
+      out.push(
+        `  -- ${titulo} — janela desta conversa; texto omitido de propósito.`,
+        '     O que aparece nela são as suas próprias mensagens: não use como leitura da tela.',
+      )
+      continue
+    }
     out.push(`  -- ${titulo} — ${g.linhas.length} linhas`)
     for (const l of g.linhas.slice(0, restante)) {
       out.push(`     (${l.x},${l.y}) ${l.texto}`)
@@ -470,7 +498,8 @@ function construirFerramenta(nomeFerramenta) {
           type: 'boolean',
           description:
             'Também pedir ao modelo visual uma leitura de layout e estado. ' +
-            'Mais lento; o texto da tela já vem do OCR sem isso.',
+            'Use sempre que o usuário perguntar o que aparece ou como está a tela; ' +
+            'para só listar janelas ou achar um texto, o OCR basta.',
         },
         controles: {
           type: 'string',

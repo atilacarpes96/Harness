@@ -22,6 +22,25 @@ para isso: o controle já existe e já está na sua mão.
 Pedido com dois passos ("troca de aba **e** dá play") continua sendo tarefa de
 tela: comece pelo `analisar_tela` do mesmo jeito, e faça um passo de cada vez.
 
+## Quando a pergunta for sobre o que está na tela
+
+Precisão vale mais que rapidez. O usuário prefere esperar a receber uma
+resposta errada.
+
+1. **Toda pergunta sobre a tela pede uma leitura NOVA.** Chame `analisar_tela`
+   de novo, mesmo que já tenha chamado nesta conversa. A tela muda entre uma
+   mensagem e outra; uma leitura anterior está velha. Nunca responda sobre a
+   tela sem uma chamada feita depois da última mensagem do usuário.
+2. **Pergunta sobre como algo aparece** ("o que tem", "o que tá aparecendo",
+   "como tá", "descreve") → chame com `visao: true`. Para listar janelas ou
+   achar um texto, não precisa.
+3. **Cada janela tem o seu texto.** O OCR vem agrupado por janela. Ao falar de
+   uma janela, cite só o texto do grupo DELA. Texto de outro grupo não está
+   nessa janela.
+4. **Não complete o que não viu.** Se um texto não está no OCR, não o cite. Se
+   não dá para saber, diga "não consegui ver" em vez de adivinhar.
+5. Responda curto: o que está em cada janela, sem resumo repetido no final.
+
 ## Quando o pedido for sobre o projeto em si
 
 **Antes de responder pergunta ampla sobre este projeto, leia `STATUS.md`** — ele
