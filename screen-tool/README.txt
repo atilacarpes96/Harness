@@ -240,3 +240,23 @@ LIMITES CONHECIDOS
   Para selecionar tudo de forma portátil: `ctrl+home` e depois
   `ctrl+shift+end`.
 - Não há desfazer. O agente age na máquina de verdade.
+
+
+TELA.MJS — LINHA DE COMANDO ENXUTA (para o Claude, sem o dsh)
+
+Mesmas camadas (elements.ps1, act.ps1) mais o texto.ps1, com saída de uma
+linha por passo. Custos medidos em harness-bench/results/custos-claude-2026-10-07.md.
+
+  node screen-tool/tela.mjs janelas
+  node screen-tool/tela.mjs controles "<janela>" [filtro] [--tipos Button,Edit] [--pos]
+  node screen-tool/tela.mjs texto "<janela>" [filtro] [--max 2000] [--de "<trecho>"]
+  node screen-tool/tela.mjs ler "<janela>" <controle>
+  node screen-tool/tela.mjs faz "<janela>" <passo> <passo> ...
+
+Passos: clicar=<nome|id>  duplo=  clicar@x,y  digitar=  trocar=  colar=
+        teclas=  rolar=  esperar=  sumir=  ler=  texto=  focar  janela=
+        ir=<url>  pausa=<ms>
+
+Exemplo (conta na Calculadora e confere):
+  node screen-tool/tela.mjs faz Calculadora focar clicar=num1Button \
+       clicar=plusButton clicar=num2Button clicar=equalButton ler=CalculatorResults

@@ -33,7 +33,10 @@ param(
   [string]$Teclas = '',
   [int]$Quantidade = 0,
   [string]$JanelaEsperada = '',
-  [switch]$Simular
+  [switch]$Simular,
+  # Em digitar: colar pela area de transferencia (ctrl+v) em vez de teclar.
+  # Para texto longo. O conteudo anterior da area de transferencia e devolvido.
+  [switch]$Colar
 )
 
 $ErrorActionPreference = 'Stop'
@@ -154,16 +157,17 @@ public class Win32Act {
   public static void Wheel(int notches) {
     Push(new INPUT[] { Mouse(WHEEL, 0, 0, notches * 120) });
   }
+  // Um caractere por envio, com pausa. Em lotes de 20 o Bloco de Notas novo do
+  // Windows 11 embaralhava o texto ("Teste aaaaaaude:kkkk...") e a acao
+  // informava sucesso; o Chrome aceitava. Medido em 07/10/2026 no Bloco de
+  // Notas: lote 20 / pausa 5 ms e lote 1 / pausa 0 embaralham; lote 1 com 3 ms
+  // ou mais sai certo. 5 ms da folga e custa ~0,5 s a cada 100 caracteres.
+  // Texto longo vai melhor por -Colar.
   public static void TypeText(string s) {
-    var lote = new System.Collections.Generic.List<INPUT>();
     foreach (char c in s) {
-      lote.Add(Key(0, (ushort)c, UNICODE));
-      lote.Add(Key(0, (ushort)c, UNICODE | KEYUP));
-      // Em lotes: um envio unico muito grande pode ser descartado pela fila do
-      // destino, e o texto chega truncado sem nenhum erro.
-      if (lote.Count >= 40) { Push(lote.ToArray()); lote.Clear(); System.Threading.Thread.Sleep(5); }
+      Push(new INPUT[] { Key(0, (ushort)c, UNICODE), Key(0, (ushort)c, UNICODE | KEYUP) });
+      System.Threading.Thread.Sleep(5);
     }
-    if (lote.Count > 0) Push(lote.ToArray());
   }
   // Procura a janela visivel cujo titulo contenha o trecho. Devolve o primeiro
   // acerto na ordem-Z, ou seja, a mais a frente entre as candidatas.
@@ -371,9 +375,26 @@ switch ($Acao) {
       Start-Sleep -Milliseconds 40
       $resultado.substituiu = $true
     }
-    # KEYEVENTF_UNICODE manda o caractere direto, sem passar por layout de
-    # teclado: acentuacao e cedilha funcionam sem depender do ABNT2.
-    [Win32Act]::TypeText($Texto)
+    if ($Colar) {
+      # Area de transferencia exige STA; o powershell.exe 5.1 ja roda assim.
+      $antes = $null
+      try { if ([System.Windows.Forms.Clipboard]::ContainsText()) { $antes = [System.Windows.Forms.Clipboard]::GetText() } } catch { }
+      [System.Windows.Forms.Clipboard]::SetText($Texto)
+      Start-Sleep -Milliseconds 30
+      [Win32Act]::Combo([uint16[]]@(0x11), [uint16]0x56)  # ctrl+v
+      # O destino le a area de transferencia depois de receber o ctrl+v; trocar
+      # antes disso colaria o conteudo antigo.
+      Start-Sleep -Milliseconds 250
+      try {
+        if ($antes -ne $null) { [System.Windows.Forms.Clipboard]::SetText($antes) }
+        else { [System.Windows.Forms.Clipboard]::Clear() }
+      } catch { }
+      $resultado.colado = $true
+    } else {
+      # KEYEVENTF_UNICODE manda o caractere direto, sem passar por layout de
+      # teclado: acentuacao e cedilha funcionam sem depender do ABNT2.
+      [Win32Act]::TypeText($Texto)
+    }
     $resultado.caracteres = $Texto.Length
   }
 
