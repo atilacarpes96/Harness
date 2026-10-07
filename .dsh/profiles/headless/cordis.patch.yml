@@ -56,3 +56,68 @@
 # str_replace_editor (3148 chars) é redundante com read/write/edit do tool-fs
 - id: tool-str-replace-editor
   disabled: true
+- id: agent-default-model
+  name: "@deepseek-ai/dsh-agent-default-model"
+  config:
+    provider: ollama
+    # dsh-4b:32k e o mesmo qwen3-vl:4b-instruct com num_ctx 32768. A tag crua roda
+    # com 4096 no Ollama e o pedido do usuario era cortado (07/10/2026, dsh 0.2).
+    model: dsh-4b:32k
+- id: llm-pi-ai
+  name: "@deepseek-ai/dsh-llm-pi-ai"
+  config:
+    providers:
+      ollama:
+        baseURL: http://127.0.0.1:11434/v1
+        models:
+          - contextWindow: 32768
+            id: qwen3-vl:4b-instruct
+            input:
+              - text
+              - image
+            maxTokens: 8192
+            name: qwen3-vl:4b-instruct
+          - contextWindow: 65536
+            id: dsh-9b:64k
+            input:
+              - text
+              - image
+            maxTokens: 4096
+            name: dsh-9b:64k (qwen3.5 9b, contexto 64k) - preciso
+          - contextWindow: 32768
+            id: dsh-4b:32k
+            input:
+              - text
+              - image
+            maxTokens: 4096
+            name: dsh-4b:32k (4b-instruct, contexto 32k) - padrao
+          - contextWindow: 16384
+            id: dsh-4b:16k
+            input:
+              - text
+              - image
+            maxTokens: 2048
+            name: dsh-4b:16k (4b-instruct, contexto 16k)
+          - contextWindow: 1000000
+            id: glm-5.2:cloud
+            input:
+              - text
+            maxTokens: 131072
+            name: glm-5.2:cloud
+          - contextWindow: 524288
+            id: minimax-m3:cloud
+            input:
+              - text
+            maxTokens: 131072
+            name: minimax-m3:cloud
+        displayName: Ollama
+        apiKeyEnv: OLLAMA_LAUNCH_DSH_API_KEY
+        api: openai-completions
+      nvidia:
+        apiKeyEnv: NVIDIA_API_KEY
+- id: web-search-deepseek
+  name: "@deepseek-ai/dsh-web-search-deepseek"
+  config:
+    apiKeyEnv: OLLAMA_LAUNCH_DSH_API_KEY
+    baseURL: http://127.0.0.1:11434/v1
+    model: dsh-4b:32k
