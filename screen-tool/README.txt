@@ -87,7 +87,7 @@ fonte tem efeito imediato, sem reinstalar. Conferir com:
 
 Para instalar em um profile novo:
 
-  dsh plugin --profile <nome> add link:E:/DSHARNESS/screen-tool
+  dsh plugin --profile <nome> add link:E:/Programas desenvolvidos/DSHARNESS/screen-tool
 
 
 CAMADA DE CONTROLE — interagir_tela (act.ps1)

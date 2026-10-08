@@ -23,3 +23,6 @@ harness-bench/results/requests.jsonl
 
 # icone gerado pelo instalar-atalho.ps1
 dsharness.ico
+
+# registros do gerenciador de plugins do dsh 0.2
+.dsh/profiles/*/.plugin-manager/

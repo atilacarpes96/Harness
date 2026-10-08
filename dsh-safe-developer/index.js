@@ -1,11 +1,13 @@
 import { execFile } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { readFile, readdir, stat } from 'node:fs/promises'
-import { isAbsolute, join, relative, resolve } from 'node:path'
+import { dirname, isAbsolute, join, relative, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 
 const execFileAsync = promisify(execFile)
-const ALLOWED_ROOT = resolve('E:\\DSHARNESS')
+// A raiz do DSHARNESS e a pasta acima deste plugin; nao depende de onde ela estiver.
+const ALLOWED_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 
 export const name = 'safe-developer'
 export const inject = ['tools']
@@ -340,7 +342,7 @@ export function apply(ctx) {
         projeto: {
           type: 'string',
           description:
-            'Projeto localizado dentro de E:\\DSHARNESS.',
+            'Projeto localizado dentro da pasta do DSHARNESS.',
         },
         perfil: {
           type: 'string',

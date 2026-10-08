@@ -24,6 +24,9 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $RAIZ = Split-Path -Parent $MyInvocation.MyCommand.Path
+# O dsh acha os profiles por DSH_HOME. Fixar aqui faz o atalho funcionar mesmo
+# que a variavel do Windows ainda aponte para uma pasta antiga.
+$env:DSH_HOME = Join-Path $RAIZ '.dsh'
 $OLLAMA = 'http://127.0.0.1:11434'
 
 # Onde a URL da instancia fica guardada. Existe por um motivo concreto: o dsh
@@ -160,8 +163,11 @@ if ($modelos) {
 
 # -- 2. modelo padrao --------------------------------------------------------
 Passo 2 'Conferindo o modelo padrao'
-$cfg = Join-Path $RAIZ '.dsh\settings.yaml'
-$padrao = 'dsh-4b:16k'
+# Desde o dsh 0.2 a configuracao fica no profile (o settings.yaml virou
+# settings.yaml.imported na migracao de 07/10/2026).
+$cfg = Join-Path $RAIZ '.dsh\profiles\web\cordis.patch.yml'
+if (-not (Test-Path $cfg)) { $cfg = Join-Path $RAIZ '.dsh\settings.yaml' }
+$padrao = 'dsh-4b:32k'
 if (Test-Path $cfg) {
   # Le so a primeira linha "model:" do bloco agent-default-model.
   $linha = (Select-String -Path $cfg -Pattern '^\s*model:\s*(\S+)' | Select-Object -First 1)

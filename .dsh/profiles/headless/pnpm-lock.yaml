@@ -9,8 +9,8 @@ importers:
   .:
     dependencies:
       dsh-safe-developer:
-        specifier: link:E:/DSHARNESS/dsh-safe-developer
+        specifier: link:../../../dsh-safe-developer
         version: link:../../../dsh-safe-developer
       dsh-screen-analyzer:
-        specifier: link:E:/DSHARNESS/screen-tool
+        specifier: link:../../../screen-tool
         version: link:../../../screen-tool

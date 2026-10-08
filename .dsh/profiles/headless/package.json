@@ -2,8 +2,8 @@
   "name": "dsh-profile-headless",
   "private": true,
   "dependencies": {
-    "dsh-safe-developer": "link:E:/DSHARNESS/dsh-safe-developer",
-    "dsh-screen-analyzer": "link:E:/DSHARNESS/screen-tool"
+    "dsh-safe-developer": "link:../../../dsh-safe-developer",
+    "dsh-screen-analyzer": "link:../../../screen-tool"
   },
   "dsh": {
     "profile": {
