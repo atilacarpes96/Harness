@@ -1,0 +1,421 @@
+{
+  "format": 1,
+  "title": {
+    "en": "DSHARNESS plugins",
+    "pt": "Plugins do DSHARNESS"
+  },
+  "description": {
+    "en": "Plugins that connect the local dsh agent to the programs on this PC: images, transcription, documents, screen and more.",
+    "pt": "Plugins que ligam o agente local do dsh aos programas do PC: imagens, transcrição, documentos, tela e mais."
+  },
+  "metadata": {
+    "categories": {
+      "programas": {
+        "title": {
+          "en": "Your programs",
+          "pt": "Seus programas"
+        }
+      },
+      "tela": {
+        "title": {
+          "en": "Screen",
+          "pt": "Tela"
+        }
+      },
+      "seguranca": {
+        "title": {
+          "en": "Safety",
+          "pt": "Segurança"
+        }
+      },
+      "interface": {
+        "title": {
+          "en": "Interface",
+          "pt": "Interface"
+        }
+      }
+    },
+    "labels": {
+      "gpu": {
+        "title": {
+          "en": "Uses the GPU",
+          "pt": "Usa a placa de vídeo"
+        }
+      },
+      "local": {
+        "title": {
+          "en": "100% local",
+          "pt": "100% local"
+        }
+      },
+      "windows": {
+        "title": {
+          "en": "Windows only",
+          "pt": "Só Windows"
+        }
+      },
+      "interface": {
+        "title": {
+          "en": "Changes the interface",
+          "pt": "Mexe na interface"
+        }
+      }
+    }
+  },
+  "plugins": [
+    {
+      "name": "dsh-meus-programas",
+      "title": {
+        "en": "My programs",
+        "pt": "Meus programas"
+      },
+      "description": {
+        "en": "Lists, opens and explains your programs and desktop shortcuts by name.",
+        "pt": "Lista, abre e explica os seus programas e os atalhos da área de trabalho, pelo nome."
+      },
+      "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PGRlZnM+PGxpbmVhckdyYWRpZW50IGlkPSJnIiB4MT0iMCIgeTE9IjAiIHgyPSIxIiB5Mj0iMSI+PHN0b3Agb2Zmc2V0PSIwIiBzdG9wLWNvbG9yPSIjNDJhNWY1Ii8+PHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjMzk0OWFiIi8+PC9saW5lYXJHcmFkaWVudD48L2RlZnM+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTQiIGZpbGw9InVybCgjZykiLz48ZyBmaWxsPSIjZmZmIj48cmVjdCB4PSIxNSIgeT0iMTUiIHdpZHRoPSIxNSIgaGVpZ2h0PSIxNSIgcng9IjQiLz48cmVjdCB4PSIzNCIgeT0iMTUiIHdpZHRoPSIxNSIgaGVpZ2h0PSIxNSIgcng9IjQiLz48cmVjdCB4PSIxNSIgeT0iMzQiIHdpZHRoPSIxNSIgaGVpZ2h0PSIxNSIgcng9IjQiLz48cmVjdCB4PSIzNCIgeT0iMzQiIHdpZHRoPSIxNSIgaGVpZ2h0PSIxNSIgcng9IjQiIG9wYWNpdHk9Ii42Ii8+PC9nPjwvc3ZnPg==",
+      "author": "atilacarpes96",
+      "homepage": "https://github.com/atilacarpes96/Harness/tree/main/plugins/meus-programas",
+      "repository": {
+        "url": "https://github.com/atilacarpes96/Harness",
+        "directory": "plugins/meus-programas"
+      },
+      "metadata": {
+        "category": "programas",
+        "labels": [
+          "local",
+          "windows"
+        ],
+        "keywords": [
+          "programas",
+          "atalhos",
+          "abrir",
+          "apps",
+          "launcher"
+        ]
+      },
+      "versions": [
+        {
+          "version": "0.1.0",
+          "publishTimestamp": 1793756896,
+          "source": {
+            "type": "git",
+            "url": "https://github.com/atilacarpes96/Harness",
+            "commit": "890a21e8651c5c158e244d022ae891efc1a08c3c",
+            "path": "plugins/meus-programas"
+          }
+        }
+      ]
+    },
+    {
+      "name": "dsh-gerador-imagens",
+      "title": {
+        "en": "Image generator",
+        "pt": "Gerador de Imagens"
+      },
+      "description": {
+        "en": "Generates images on your GPU with ComfyUI, shows them in the chat, and adds a ComfyUI button to the sidebar.",
+        "pt": "Gera imagens na sua placa de vídeo com o ComfyUI, mostra no chat e põe o botão ComfyUI na barra lateral."
+      },
+      "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PGRlZnM+PGxpbmVhckdyYWRpZW50IGlkPSJnIiB4MT0iMCIgeTE9IjAiIHgyPSIxIiB5Mj0iMSI+PHN0b3Agb2Zmc2V0PSIwIiBzdG9wLWNvbG9yPSIjN2M0ZGZmIi8+PHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjMWU4OGU1Ii8+PC9saW5lYXJHcmFkaWVudD48L2RlZnM+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTQiIGZpbGw9InVybCgjZykiLz48cmVjdCB4PSIxNCIgeT0iMTgiIHdpZHRoPSIzNiIgaGVpZ2h0PSIyOCIgcng9IjUiIGZpbGw9Im5vbmUiIHN0cm9rZT0iI2ZmZiIgc3Ryb2tlLXdpZHRoPSIzLjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPjxjaXJjbGUgY3g9IjI1IiBjeT0iMjciIHI9IjMuNSIgZmlsbD0iI2ZmZiIvPjxwYXRoIGQ9Ik0xNyA0M2wxMC0xMCA3IDcgNS01IDggOCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utd2lkdGg9IjMuNSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+PC9zdmc+",
+      "author": "atilacarpes96",
+      "homepage": "https://github.com/atilacarpes96/Harness/tree/main/plugins/gerador-imagens",
+      "repository": {
+        "url": "https://github.com/atilacarpes96/Harness",
+        "directory": "plugins/gerador-imagens"
+      },
+      "metadata": {
+        "category": "programas",
+        "labels": [
+          "gpu",
+          "local",
+          "interface"
+        ],
+        "keywords": [
+          "imagem",
+          "comfyui",
+          "qwen",
+          "flux",
+          "anime",
+          "image"
+        ]
+      },
+      "versions": [
+        {
+          "version": "0.2.0",
+          "publishTimestamp": 1793756896,
+          "source": {
+            "type": "git",
+            "url": "https://github.com/atilacarpes96/Harness",
+            "commit": "890a21e8651c5c158e244d022ae891efc1a08c3c",
+            "path": "plugins/gerador-imagens"
+          }
+        }
+      ]
+    },
+    {
+      "name": "dsh-transcritor",
+      "title": {
+        "en": "Transcriber",
+        "pt": "Transcritor"
+      },
+      "description": {
+        "en": "Turns speech into text with local Whisper: YouTube, TikTok and Instagram links or audio files.",
+        "pt": "Transforma fala em texto com o Whisper do PC: links do YouTube, TikTok e Instagram ou arquivos de áudio."
+      },
+      "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PGRlZnM+PGxpbmVhckdyYWRpZW50IGlkPSJnIiB4MT0iMCIgeTE9IjAiIHgyPSIxIiB5Mj0iMSI+PHN0b3Agb2Zmc2V0PSIwIiBzdG9wLWNvbG9yPSIjMWRlOWI2Ii8+PHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjMDA4MzhmIi8+PC9saW5lYXJHcmFkaWVudD48L2RlZnM+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTQiIGZpbGw9InVybCgjZykiLz48ZyBmaWxsPSIjZmZmIj48cmVjdCB4PSIxNSIgeT0iMjciIHdpZHRoPSI0LjUiIGhlaWdodD0iMTAiIHJ4PSIyLjI1Ii8+PHJlY3QgeD0iMjIuNSIgeT0iMjEiIHdpZHRoPSI0LjUiIGhlaWdodD0iMjIiIHJ4PSIyLjI1Ii8+PHJlY3QgeD0iMzAiIHk9IjE1IiB3aWR0aD0iNC41IiBoZWlnaHQ9IjM0IiByeD0iMi4yNSIvPjxyZWN0IHg9IjM3LjUiIHk9IjIzIiB3aWR0aD0iNC41IiBoZWlnaHQ9IjE4IiByeD0iMi4yNSIvPjxyZWN0IHg9IjQ1IiB5PSIyOCIgd2lkdGg9IjQuNSIgaGVpZ2h0PSI4IiByeD0iMi4yNSIvPjwvZz48L3N2Zz4=",
+      "author": "atilacarpes96",
+      "homepage": "https://github.com/atilacarpes96/Harness/tree/main/plugins/transcritor",
+      "repository": {
+        "url": "https://github.com/atilacarpes96/Harness",
+        "directory": "plugins/transcritor"
+      },
+      "metadata": {
+        "category": "programas",
+        "labels": [
+          "gpu",
+          "local"
+        ],
+        "keywords": [
+          "transcrever",
+          "whisper",
+          "youtube",
+          "audio",
+          "video",
+          "resumo"
+        ]
+      },
+      "versions": [
+        {
+          "version": "0.1.0",
+          "publishTimestamp": 1793756896,
+          "source": {
+            "type": "git",
+            "url": "https://github.com/atilacarpes96/Harness",
+            "commit": "890a21e8651c5c158e244d022ae891efc1a08c3c",
+            "path": "plugins/transcritor"
+          }
+        }
+      ]
+    },
+    {
+      "name": "dsh-documentos",
+      "title": {
+        "en": "Documents",
+        "pt": "Documentos"
+      },
+      "description": {
+        "en": "Reads PDF, Word, Excel and PowerPoint files locally, in parts, so the agent can summarize them.",
+        "pt": "Lê PDF, Word, Excel e PowerPoint sem nada sair do PC, em partes, para o agente resumir."
+      },
+      "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PGRlZnM+PGxpbmVhckdyYWRpZW50IGlkPSJnIiB4MT0iMCIgeTE9IjAiIHgyPSIxIiB5Mj0iMSI+PHN0b3Agb2Zmc2V0PSIwIiBzdG9wLWNvbG9yPSIjZmZiMzAwIi8+PHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjZjQ1MTFlIi8+PC9saW5lYXJHcmFkaWVudD48L2RlZnM+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTQiIGZpbGw9InVybCgjZykiLz48cGF0aCBkPSJNMjAgMTJoMTdsMTEgMTF2MjlhNCA0IDAgMCAxLTQgNEgyMGE0IDQgMCAwIDEtNC00VjE2YTQgNCAwIDAgMSA0LTR6IiBmaWxsPSIjZmZmIi8+PHBhdGggZD0iTTM3IDEydjExaDExIiBmaWxsPSJub25lIiBzdHJva2U9IiNmNDUxMWUiIHN0cm9rZS13aWR0aD0iMyIvPjxnIHN0cm9rZT0iI2Y0NTExZSIgc3Ryb2tlLXdpZHRoPSIzIiBzdHJva2UtbGluZWNhcD0icm91bmQiPjxsaW5lIHgxPSIyMyIgeTE9IjMyIiB4Mj0iNDEiIHkyPSIzMiIvPjxsaW5lIHgxPSIyMyIgeTE9IjM5IiB4Mj0iNDEiIHkyPSIzOSIvPjxsaW5lIHgxPSIyMyIgeTE9IjQ2IiB4Mj0iMzQiIHkyPSI0NiIvPjwvZz48L3N2Zz4=",
+      "author": "atilacarpes96",
+      "homepage": "https://github.com/atilacarpes96/Harness/tree/main/plugins/documentos",
+      "repository": {
+        "url": "https://github.com/atilacarpes96/Harness",
+        "directory": "plugins/documentos"
+      },
+      "metadata": {
+        "category": "programas",
+        "labels": [
+          "local"
+        ],
+        "keywords": [
+          "pdf",
+          "word",
+          "excel",
+          "documento",
+          "resumir",
+          "anydoc"
+        ]
+      },
+      "versions": [
+        {
+          "version": "0.1.0",
+          "publishTimestamp": 1793756896,
+          "source": {
+            "type": "git",
+            "url": "https://github.com/atilacarpes96/Harness",
+            "commit": "890a21e8651c5c158e244d022ae891efc1a08c3c",
+            "path": "plugins/documentos"
+          }
+        }
+      ]
+    },
+    {
+      "name": "dsh-confirmar-perigoso",
+      "title": {
+        "en": "Confirm risky actions",
+        "pt": "Confirmar o que é perigoso"
+      },
+      "description": {
+        "en": "Full access for the agent, but it stops and asks before deleting, formatting, changing Windows, installing or git push.",
+        "pt": "Acesso total para o agente, mas ele para e pergunta antes de apagar, formatar, mexer no Windows, instalar ou dar git push."
+      },
+      "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PGRlZnM+PGxpbmVhckdyYWRpZW50IGlkPSJnIiB4MT0iMCIgeTE9IjAiIHgyPSIxIiB5Mj0iMSI+PHN0b3Agb2Zmc2V0PSIwIiBzdG9wLWNvbG9yPSIjZmY1MjUyIi8+PHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjYzIxODViIi8+PC9saW5lYXJHcmFkaWVudD48L2RlZnM+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTQiIGZpbGw9InVybCgjZykiLz48cGF0aCBkPSJNMzIgMTFsMTcgNnYxM2MwIDExLTcgMTktMTcgMjMtMTAtNC0xNy0xMi0xNy0yM1YxN3oiIGZpbGw9IiNmZmYiLz48cGF0aCBkPSJNMjQgMzJsNiA2IDExLTEyIiBmaWxsPSJub25lIiBzdHJva2U9IiNkODFiNjAiIHN0cm9rZS13aWR0aD0iNCIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+PC9zdmc+",
+      "author": "atilacarpes96",
+      "homepage": "https://github.com/atilacarpes96/Harness/tree/main/plugins/confirmar-perigoso",
+      "repository": {
+        "url": "https://github.com/atilacarpes96/Harness",
+        "directory": "plugins/confirmar-perigoso"
+      },
+      "metadata": {
+        "category": "seguranca",
+        "labels": [
+          "local",
+          "windows"
+        ],
+        "keywords": [
+          "seguranca",
+          "aprovacao",
+          "permissao",
+          "confirmar",
+          "safety"
+        ]
+      },
+      "versions": [
+        {
+          "version": "0.1.0",
+          "publishTimestamp": 1793756896,
+          "source": {
+            "type": "git",
+            "url": "https://github.com/atilacarpes96/Harness",
+            "commit": "890a21e8651c5c158e244d022ae891efc1a08c3c",
+            "path": "plugins/confirmar-perigoso"
+          }
+        }
+      ]
+    },
+    {
+      "name": "dsh-skins",
+      "title": {
+        "en": "Skins",
+        "pt": "Skins"
+      },
+      "description": {
+        "en": "Five Apple-style skins for the interface: Glass, Aurora, Sunset, Graphite and Paper.",
+        "pt": "Cinco skins no estilo Apple para a interface: Vidro, Aurora, Pôr do sol, Grafite e Papel."
+      },
+      "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PGRlZnM+PGxpbmVhckdyYWRpZW50IGlkPSJnIiB4MT0iMCIgeTE9IjAiIHgyPSIxIiB5Mj0iMSI+PHN0b3Agb2Zmc2V0PSIwIiBzdG9wLWNvbG9yPSIjZjA2MjkyIi8+PHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjN2M0ZGZmIi8+PC9saW5lYXJHcmFkaWVudD48L2RlZnM+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTQiIGZpbGw9InVybCgjZykiLz48cGF0aCBkPSJNMzIgMTJjLTExIDAtMjAgOC41LTIwIDE5czguNSAxOSAxOCAxOWMzIDAgNC41LTIgNC41LTQuMiAwLTIuMy0yLTMuMi0yLTUuMyAwLTIuNiAyLjItNC4zIDUtNC4zaDQuNWM2LjIgMCAxMC00LjMgMTAtOS41QzUyIDE4LjUgNDMuNSAxMiAzMiAxMnoiIGZpbGw9IiNmZmYiLz48Y2lyY2xlIGN4PSIyMi41IiBjeT0iMjkiIHI9IjMuNiIgZmlsbD0iIzdjNGRmZiIvPjxjaXJjbGUgY3g9IjMwLjUiIGN5PSIyMC41IiByPSIzLjYiIGZpbGw9IiMwMGJmYTUiLz48Y2lyY2xlIGN4PSI0MSIgY3k9IjIzLjUiIHI9IjMuNiIgZmlsbD0iI2ZmOTEwMCIvPjwvc3ZnPg==",
+      "author": "atilacarpes96",
+      "homepage": "https://github.com/atilacarpes96/Harness/tree/main/plugins/skins",
+      "repository": {
+        "url": "https://github.com/atilacarpes96/Harness",
+        "directory": "plugins/skins"
+      },
+      "metadata": {
+        "category": "interface",
+        "labels": [
+          "interface"
+        ],
+        "keywords": [
+          "tema",
+          "skin",
+          "vidro",
+          "apple",
+          "aparencia",
+          "theme"
+        ]
+      },
+      "versions": [
+        {
+          "version": "0.1.0",
+          "publishTimestamp": 1793756896,
+          "source": {
+            "type": "git",
+            "url": "https://github.com/atilacarpes96/Harness",
+            "commit": "890a21e8651c5c158e244d022ae891efc1a08c3c",
+            "path": "plugins/skins"
+          }
+        }
+      ]
+    },
+    {
+      "name": "dsh-screen-analyzer",
+      "title": {
+        "en": "Screen tool",
+        "pt": "Ferramenta de tela"
+      },
+      "description": {
+        "en": "Lets the agent see and act on the Windows screen through the accessibility tree, with a Scroll Lock brake.",
+        "pt": "Deixa o agente ver e agir na tela do Windows pela árvore de acessibilidade, com o freio do Scroll Lock."
+      },
+      "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PGRlZnM+PGxpbmVhckdyYWRpZW50IGlkPSJnIiB4MT0iMCIgeTE9IjAiIHgyPSIxIiB5Mj0iMSI+PHN0b3Agb2Zmc2V0PSIwIiBzdG9wLWNvbG9yPSIjNDNhMDQ3Ii8+PHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjMDA4OTdiIi8+PC9saW5lYXJHcmFkaWVudD48L2RlZnM+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTQiIGZpbGw9InVybCgjZykiLz48cmVjdCB4PSIxMiIgeT0iMTQiIHdpZHRoPSI0MCIgaGVpZ2h0PSIyOCIgcng9IjQiIGZpbGw9Im5vbmUiIHN0cm9rZT0iI2ZmZiIgc3Ryb2tlLXdpZHRoPSIzLjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPjxwYXRoIGQ9Ik0yNiA1MGgxMiIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utd2lkdGg9IjMuNSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+PHBhdGggZD0iTTI5IDIxbDEzIDcuNS01LjUgMS42IDMuMiA1LjgtMy4xIDEuNy0zLjItNS44LTQuNCAzLjZ6IiBmaWxsPSIjZmZmIi8+PC9zdmc+",
+      "author": "atilacarpes96",
+      "homepage": "https://github.com/atilacarpes96/Harness/tree/main/screen-tool",
+      "repository": {
+        "url": "https://github.com/atilacarpes96/Harness",
+        "directory": "screen-tool"
+      },
+      "metadata": {
+        "category": "tela",
+        "labels": [
+          "local",
+          "windows"
+        ],
+        "keywords": [
+          "tela",
+          "clicar",
+          "digitar",
+          "janela",
+          "automacao",
+          "screen"
+        ]
+      },
+      "versions": [
+        {
+          "version": "0.2.0",
+          "publishTimestamp": 1793756896,
+          "source": {
+            "type": "git",
+            "url": "https://github.com/atilacarpes96/Harness",
+            "commit": "890a21e8651c5c158e244d022ae891efc1a08c3c",
+            "path": "screen-tool"
+          }
+        }
+      ]
+    },
+    {
+      "name": "dsh-safe-developer",
+      "title": {
+        "en": "Plugin checker",
+        "pt": "Conferir plugin"
+      },
+      "description": {
+        "en": "Checks another local plugin (syntax, version, hash, dump-config) before you trust it.",
+        "pt": "Confere outro plugin local (sintaxe, versão, hash, dump-config) antes de confiar nele."
+      },
+      "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PGRlZnM+PGxpbmVhckdyYWRpZW50IGlkPSJnIiB4MT0iMCIgeTE9IjAiIHgyPSIxIiB5Mj0iMSI+PHN0b3Agb2Zmc2V0PSIwIiBzdG9wLWNvbG9yPSIjNzg5MDljIi8+PHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjNDU1YTY0Ii8+PC9saW5lYXJHcmFkaWVudD48L2RlZnM+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTQiIGZpbGw9InVybCgjZykiLz48Y2lyY2xlIGN4PSIzMiIgY3k9IjMyIiByPSIxNyIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utd2lkdGg9IjMuNSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+PHBhdGggZD0iTTI0IDMybDYgNiAxMS0xMiIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utd2lkdGg9IjMuNSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+PC9zdmc+",
+      "author": "atilacarpes96",
+      "homepage": "https://github.com/atilacarpes96/Harness/tree/main/dsh-safe-developer",
+      "repository": {
+        "url": "https://github.com/atilacarpes96/Harness",
+        "directory": "dsh-safe-developer"
+      },
+      "metadata": {
+        "category": "seguranca",
+        "labels": [
+          "local"
+        ],
+        "keywords": [
+          "plugin",
+          "validar",
+          "conferir",
+          "desenvolvedor"
+        ]
+      },
+      "versions": [
+        {
+          "version": "0.1.0",
+          "publishTimestamp": 1793756896,
+          "source": {
+            "type": "git",
+            "url": "https://github.com/atilacarpes96/Harness",
+            "commit": "890a21e8651c5c158e244d022ae891efc1a08c3c",
+            "path": "dsh-safe-developer"
+          }
+        }
+      ]
+    }
+  ]
+}
