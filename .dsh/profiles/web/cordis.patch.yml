@@ -163,3 +163,49 @@
   name: "@deepseek-ai/dsh-agent-preset-registry"
   config:
     default: enxuto
+
+# Terminal do agente: acesso total, perguntando antes do que e arriscado
+# (03/11/2026, escolha do usuario). O modo "workspace-write" do dsh nao
+# funciona nesta pasta: ele grava um rotulo de integridade Low na pasta e isso
+# exige WRITE_OWNER, que o usuario nao tem no disco E: (ver STATUS.md). Aqui o
+# isolamento fica desligado e a aprovacao em "ask": o plugin confirmar-perigoso
+# devolve "perguntar" para apagar, formatar, mexer no Windows, instalar, git
+# push e mandar dados para fora. DSH_PERMISSION_MODE ainda manda, se definida.
+- id: sandbox-policy
+  name: "@deepseek-ai/dsh-sandbox-policy"
+  config:
+    mode: !!js process.env.DSH_PERMISSION_MODE ?? 'danger-full-access'
+    workspaceRoot: !!js process.cwd()
+- id: approval
+  name: "@deepseek-ai/dsh-user-approval"
+  config:
+    policy: ask
+- id: permission
+  name: "@deepseek-ai/dsh-permission-presets"
+  config:
+    presets:
+      total-com-confirmacao:
+        sandbox: danger-full-access
+        approval: ask
+        name: Acesso total com confirmação
+        description: >-
+          Mexe em qualquer pasta, mas para e pergunta antes de apagar, formatar,
+          mexer no Windows, instalar, dar git push ou mandar dados para fora.
+      read-only:
+        sandbox: read-only
+        approval: ask
+      workspace-write:
+        sandbox: workspace-write
+        approval: ask
+      danger-full-access:
+        sandbox: danger-full-access
+        approval: never
+    defaultPreset: total-com-confirmacao
+
+# Catalogo proprio na aba "Descubra" de Plug-ins (03/11/2026): o indice fica no
+# repositorio publico do Harness e e gerado por catalogo/gerar-catalogo.mjs.
+- id: plugin-market
+  name: "@deepseek-ai/dsh-plugin-market"
+  config:
+    indexes:
+      - https://raw.githubusercontent.com/atilacarpes96/Harness/main/catalogo/plugins.json

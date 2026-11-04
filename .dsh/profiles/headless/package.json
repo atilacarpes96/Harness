@@ -2,6 +2,7 @@
   "name": "dsh-profile-headless",
   "private": true,
   "dependencies": {
+    "dsh-confirmar-perigoso": "link:../../../plugins/confirmar-perigoso",
     "dsh-documentos": "link:../../../plugins/documentos",
     "dsh-gerador-imagens": "link:../../../plugins/gerador-imagens",
     "dsh-meus-programas": "link:../../../plugins/meus-programas",
@@ -19,7 +20,8 @@
         "dsh-meus-programas",
         "dsh-gerador-imagens",
         "dsh-transcritor",
-        "dsh-documentos"
+        "dsh-documentos",
+        "dsh-confirmar-perigoso"
       ]
     }
   }

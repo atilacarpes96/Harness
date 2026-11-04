@@ -4,6 +4,10 @@
 //
 // Nada de caminho pessoal fixo aqui: a pasta dos programas e a pasta acima do
 // DSHARNESS (ou DSH_PROGRAMAS, se definida).
+//
+// FONTE UNICA: plugins/_comum/comum.js. Cada plugin leva uma copia (comum.js na
+// pasta dele), porque quem instala pelo catalogo (aba Descubra) recebe so a
+// pasta do plugin. Depois de editar aqui: node plugins/_comum/sincronizar.mjs
 
 import { execFile, spawn } from 'node:child_process'
 import { dirname, join, resolve } from 'node:path'
@@ -11,13 +15,17 @@ import { fileURLToPath } from 'node:url'
 
 const AQUI = dirname(fileURLToPath(import.meta.url))
 
-// plugins/_comum -> plugins -> DSHARNESS -> pasta dos programas
-export const RAIZ_DSHARNESS = resolve(AQUI, '..', '..')
+// O dsh roda com DSH_HOME = <DSHARNESS>\.dsh (o iniciar.ps1 garante). Sem ele,
+// vale a posicao do arquivo: plugins\<plugin>\comum.js -> DSHARNESS.
+export const RAIZ_DSHARNESS = process.env.DSH_HOME
+  ? resolve(process.env.DSH_HOME, '..')
+  : resolve(AQUI, '..', '..')
 export const RAIZ_PROGRAMAS =
   process.env.DSH_PROGRAMAS || resolve(RAIZ_DSHARNESS, '..')
 
 const OLLAMA = process.env.DSH_OLLAMA_URL || 'http://127.0.0.1:11434'
 const COMFY = process.env.DSH_COMFY_URL || 'http://127.0.0.1:8188'
+export const COMFY_URL = COMFY
 
 export function pastaDoPrograma(nome) {
   return join(RAIZ_PROGRAMAS, nome)

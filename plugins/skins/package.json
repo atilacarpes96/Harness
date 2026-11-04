@@ -1,0 +1,26 @@
+{
+  "name": "dsh-skins",
+  "version": "0.1.0",
+  "description": "Skins para a interface: Vidro, Aurora, Pôr do sol, Grafite e Papel, escolhidas em Configurações > Geral",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./package.json": "./package.json"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-ui-theme",
+        "@deepseek-ai/dsh-client-ui-settings"
+      ]
+    }
+  }
+}

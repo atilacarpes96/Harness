@@ -3,13 +3,10 @@
   "version": "0.2.0",
   "type": "module",
   "main": "index.js",
-  "files": [
-    "index.js",
-    "cordis.patch.yml"
-  ],
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"
     }
-  }
+  },
+  "description": "Ferramentas analisar_tela/ver_tela e interagir_tela: ver e agir na tela do Windows pela árvore de acessibilidade, com trava no Scroll Lock"
 }

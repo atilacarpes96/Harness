@@ -11,16 +11,21 @@
         "dsh-meus-programas",
         "dsh-gerador-imagens",
         "dsh-transcritor",
-        "dsh-documentos"
+        "dsh-documentos",
+        "dsh-confirmar-perigoso",
+        "dsh-skins",
+        "@deepseek-ai/dsh-experimental-plugin-market-bundle"
       ]
     }
   },
   "dependencies": {
+    "dsh-confirmar-perigoso": "link:../../../plugins/confirmar-perigoso",
     "dsh-documentos": "link:../../../plugins/documentos",
     "dsh-gerador-imagens": "link:../../../plugins/gerador-imagens",
     "dsh-meus-programas": "link:../../../plugins/meus-programas",
     "dsh-safe-developer": "link:../../../dsh-safe-developer",
     "dsh-screen-analyzer": "link:../../../screen-tool",
+    "dsh-skins": "link:../../../plugins/skins",
     "dsh-transcritor": "link:../../../plugins/transcritor"
   }
 }

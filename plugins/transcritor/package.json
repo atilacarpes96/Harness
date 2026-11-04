@@ -4,10 +4,6 @@
   "description": "Ferramenta transcrever: usa o Whisper do Transcritor (arquivo ou link)",
   "type": "module",
   "main": "index.js",
-  "files": [
-    "index.js",
-    "cordis.patch.yml"
-  ],
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"

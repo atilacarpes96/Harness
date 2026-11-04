@@ -3,13 +3,10 @@
   "version": "0.1.0",
   "type": "module",
   "main": "index.js",
-  "files": [
-    "index.js",
-    "cordis.patch.yml"
-  ],
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"
     }
-  }
+  },
+  "description": "Ferramenta validar_plugin_local: confere sintaxe, versão, hash e dump-config de outro plugin local antes de confiar nele"
 }

@@ -9,7 +9,7 @@ import { execFile, spawn } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { readdir, readFile } from 'node:fs/promises'
 import { basename, extname, join } from 'node:path'
-import { ferramenta, RAIZ_PROGRAMAS } from '../_comum/comum.js'
+import { ferramenta, RAIZ_PROGRAMAS } from './comum.js'
 
 export const name = 'meus-programas'
 export const inject = ['tools']

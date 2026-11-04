@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      dsh-confirmar-perigoso:
+        specifier: link:../../../plugins/confirmar-perigoso
+        version: link:../../../plugins/confirmar-perigoso
       dsh-documentos:
         specifier: link:../../../plugins/documentos
         version: link:../../../plugins/documentos
@@ -23,6 +26,9 @@ importers:
       dsh-screen-analyzer:
         specifier: link:../../../screen-tool
         version: link:../../../screen-tool
+      dsh-skins:
+        specifier: link:../../../plugins/skins
+        version: link:../../../plugins/skins
       dsh-transcritor:
         specifier: link:../../../plugins/transcritor
         version: link:../../../plugins/transcritor

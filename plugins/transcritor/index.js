@@ -18,7 +18,7 @@ import {
   pastaDoPrograma,
   rodar,
   ultimaLinhaJson,
-} from '../_comum/comum.js'
+} from './comum.js'
 
 export const name = 'transcritor'
 export const inject = ['tools']

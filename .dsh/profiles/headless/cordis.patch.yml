@@ -114,3 +114,40 @@
     apiKeyEnv: OLLAMA_LAUNCH_DSH_API_KEY
     baseURL: http://127.0.0.1:11434/v1
     model: dsh-4b:32k
+
+# Terminal com acesso total e aprovacao "ask" (mesmo bloco do profile web; ver
+# la o porque). Sem interface nao ha a quem perguntar: o que o plugin
+# confirmar-perigoso marcar como arriscado e negado sozinho.
+- id: sandbox-policy
+  name: "@deepseek-ai/dsh-sandbox-policy"
+  inject:
+    - headlessStartup
+  config:
+    mode: !!js process.env.DSH_PERMISSION_MODE ?? 'danger-full-access'
+    workspaceRoot: !!js process.cwd()
+    additionalWritableRoots: !!js ctx.headlessStartup.additionalWritableRoots
+- id: approval
+  name: "@deepseek-ai/dsh-user-approval"
+  config:
+    policy: ask
+- id: permission
+  name: "@deepseek-ai/dsh-permission-presets"
+  config:
+    presets:
+      total-com-confirmacao:
+        sandbox: danger-full-access
+        approval: ask
+        name: Acesso total com confirmação
+        description: >-
+          Mexe em qualquer pasta, mas para e pergunta antes de apagar, formatar,
+          mexer no Windows, instalar, dar git push ou mandar dados para fora.
+      read-only:
+        sandbox: read-only
+        approval: ask
+      workspace-write:
+        sandbox: workspace-write
+        approval: ask
+      danger-full-access:
+        sandbox: danger-full-access
+        approval: never
+    defaultPreset: total-com-confirmacao

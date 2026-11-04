@@ -16,7 +16,15 @@ import {
   pastaDoPrograma,
   rodar,
   ultimaLinhaJson,
-} from '../_comum/comum.js'
+} from './comum.js'
+import {
+  abrirPainel,
+  avisoDepoisDaImagem,
+  desligarComfy,
+  estadoComfy,
+  lerPreferencias,
+  SEGUNDOS_A_MAIS_PARA_LIGAR,
+} from './comfy.js'
 
 export const name = 'gerador-imagens'
 export const inject = ['tools']
@@ -72,7 +80,9 @@ async function gerar(args, exec) {
     r = await rodar(python, cmd, { cwd: PASTA, signal: exec?.signal })
   } finally {
     // Devolve a placa para o modelo do agente, que recarrega na proxima resposta.
-    await liberarComfy()
+    // Com "desligar depois de cada imagem" ligado no painel, fecha o ComfyUI.
+    if ((await lerPreferencias()).desligarDepois) await desligarComfy(PASTA)
+    else await liberarComfy()
   }
 
   const j = ultimaLinhaJson(r.saida)
@@ -91,8 +101,25 @@ async function gerar(args, exec) {
   if (j.prompt && j.prompt !== pedido) linhas.push(`Prompt usado (reescrito): ${j.prompt}`)
   linhas.push(
     'Os arquivos ficam na pasta "remoto" da saída do ComfyUI; a limpeza automática do Gerador manda para a Lixeira depois de alguns dias.',
+    `Diga também ao usuário: ${avisoDepoisDaImagem(await estadoComfy({ fresco: true }))}`,
   )
   return linhas.join('\n')
+}
+
+async function comfyui(args, exec) {
+  if (args?.acao === 'desligar') {
+    const r = await desligarComfy(PASTA, exec?.signal)
+    return r.ok
+      ? `${r.mensagem} A próxima imagem vai levar cerca de 1 minuto a mais, porque o ComfyUI precisa ligar de novo.`
+      : r.mensagem
+  }
+  const e = await estadoComfy({ fresco: true })
+  if (!e.ligado) {
+    return `O ComfyUI está desligado. A próxima imagem liga ele sozinha (cerca de ${SEGUNDOS_A_MAIS_PARA_LIGAR} s a mais).`
+  }
+  const ram = e.ramMB ? `, ocupando ~${(e.ramMB / 1024).toFixed(1).replace('.', ',')} GB de RAM` : ''
+  const auto = e.desligarDepois ? ' A opção "desligar depois de cada imagem" está ligada.' : ''
+  return `O ComfyUI está ligado${ram}.${auto} Desligar libera essa memória, mas a próxima imagem leva cerca de 1 minuto a mais.`
 }
 
 export function apply(ctx) {
@@ -151,4 +178,31 @@ export function apply(ctx) {
       execute: gerar,
     }),
   )
+  ctx.tools.register(
+    ferramenta({
+      name: 'comfyui',
+      description:
+        'Mostra se o ComfyUI (o motor do Gerador de Imagens) está ligado e quanta memória usa, ' +
+        'ou desliga ele. Desligar libera a memória, mas a próxima imagem leva cerca de 1 minuto a mais.',
+      parameters: {
+        type: 'object',
+        properties: {
+          acao: {
+            type: 'string',
+            enum: ['estado', 'desligar'],
+            description: 'estado = ver se está ligado; desligar = fechar o ComfyUI.',
+          },
+        },
+        required: ['acao'],
+        additionalProperties: false,
+      },
+      timeoutMs: 60_000,
+      execute: comfyui,
+    }),
+  )
+
+  // Endereco local que o botao "ComfyUI" da barra lateral usa (ver comfy.js).
+  const fechar = abrirPainel(PASTA)
+  if (typeof ctx.effect === 'function') ctx.effect(() => fechar)
+  else ctx.on?.('dispose', fechar)
 }

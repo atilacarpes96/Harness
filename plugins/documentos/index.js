@@ -10,7 +10,7 @@ import { existsSync } from 'node:fs'
 import { mkdir, readFile, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, dirname, extname, join } from 'node:path'
-import { ferramenta, fimDoLog, limparCaminho, rodar } from '../_comum/comum.js'
+import { ferramenta, fimDoLog, limparCaminho, rodar } from './comum.js'
 
 export const name = 'documentos'
 export const inject = ['tools']

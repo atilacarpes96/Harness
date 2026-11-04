@@ -4,10 +4,6 @@
   "description": "Ferramenta meus_programas: lista, abre e explica os programas e atalhos do PC",
   "type": "module",
   "main": "index.js",
-  "files": [
-    "index.js",
-    "cordis.patch.yml"
-  ],
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"
