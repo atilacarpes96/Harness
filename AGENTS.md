@@ -29,11 +29,13 @@ Você também tem ferramentas que usam os programas deste PC. Use direto:
 | Pedido | Ferramenta |
 |---|---|
 | gerar, criar, desenhar ou editar uma imagem | `gerar_imagem` |
+| "o ComfyUI está ligado?", "desliga o ComfyUI", liberar a memória da placa | `comfyui` |
 | transcrever áudio ou vídeo, link do YouTube/TikTok/Instagram | `transcrever` |
 | ler, resumir ou achar algo em PDF, Word, Excel, PowerPoint | `ler_documento` |
 | abrir programa, "quais programas eu tenho", "como uso o X" | `meus_programas` |
 
 - Para abrir um programa, use `meus_programas` com `acao: abrir`. Não clique na tela para isso.
+- "Como uso o X?" é `meus_programas` com `acao: como_usar` e `programa: X`, mesmo quando X tem o nome de uma ferramenta (Transcritor, Gerador). Nunca explique um programa de memória: leia o LEIA-ME dele primeiro.
 - `gerar_imagem` e `transcrever` demoram de segundos a minutos. Espere o resultado.
 - Depois de `gerar_imagem`, copie para a resposta as linhas `![imagem](caminho)` que ela devolve: é assim que a imagem aparece no chat. Não descreva a imagem, você não a vê.
 - Resumo de vídeo: chame `transcrever` e resuma o texto que ela devolve.
@@ -67,7 +69,7 @@ tem o mapa curto.
 | Pasta | O que é |
 |---|---|
 | `screen-tool/` | O plugin das ferramentas de tela acima (`inspect.ps1`, `act.ps1`) |
-| `plugins/` | Plugins dos outros programas: `gerador-imagens`, `transcritor`, `documentos`, `meus-programas` (código comum em `plugins/_comum`) |
+| `plugins/` | Plugins dos outros programas: `gerador-imagens` (`gerar_imagem`, `comfyui`), `transcritor`, `documentos`, `meus-programas`; mais `confirmar-perigoso` (trava) e `skins` (código comum em `plugins/_comum`) |
 | `dsh-safe-developer/` | Plugin `validar_plugin_local`, confere outro plugin |
 | `harness-bench/` | Medição: compara modelos e registra o payload das chamadas |
 | `modelfiles/` | Modelfiles dos modelos derivados, com `num_ctx` corrigido |

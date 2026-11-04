@@ -70,6 +70,60 @@ Achados:
   dar controle total da pasta ao usuário (`icacls` com `(OI)(CI)F`, sem admin,
   mantém o isolamento) ou o modo `danger-full-access` (sem isolamento). As
   ferramentas de tela e os plugins não passam pelo pwsh e funcionam.
+  **Contornado** pelo modo de acesso padrão novo (abaixo): `danger-full-access`
+  com a trava por regras.
+
+### Mais tarde no mesmo dia: trava, painel do ComfyUI, skins, catálogo e voz
+
+**Acesso total com confirmação** (`plugins/confirmar-perigoso`). O modo de acesso
+padrão virou `total-com-confirmacao`: sandbox `danger-full-access` (o pwsh volta a
+funcionar, sem o isolamento que falhava no disco E:) + aprovação `ask`. Antes de
+cada ferramenta o plugin confere uma **lista fixa de regras** (apagar, formatar,
+registro, permissões, instalar, `git push`/`reset --hard`, mandar dados para
+fora, `iex`/comando codificado, mover/renomear, editar fora do DSHARNESS); 43
+casos testados. Na web vira o cartão "Aguardando aprovação" (Rejeitar / Permitir
+uma vez); no headless o arriscado é negado sozinho. **Por que não o Auto review
+do dsh:** o revisor seria o próprio 4B local, com uma chamada de modelo a mais
+por ferramenta, e ele não pode ser o padrão. Regra fixa é rápida e previsível.
+
+**Painel do ComfyUI** (`plugins/gerador-imagens/comfy.js` e `client.js`).
+Ferramenta `comfyui` (estado, desligar) e item **ComfyUI** na barra lateral com
+painel: memória em uso, desligar, aviso de ~1 min a mais na próxima imagem e
+"desligar sozinho depois de cada imagem" (preferência em
+`%LOCALAPPDATA%\dsharness\gerador-imagens.json`). O painel fala com um endereço
+local `127.0.0.1:48231`, que só aceita páginas locais. Testado: liga e desliga de
+verdade.
+
+**Skins** (`plugins/skins/client.js`). Vidro, Aurora, Pôr do sol, Grafite e
+Papel, em Configurações > Geral. Cada skin registra um tema do dsh com os tokens
+`--dsw-alias-*` e `--dsw-specific-*`. Achado: **o dsh adota o tema salvo na
+carga da página** e passava por cima da skin; por isso ela se reaplica nos
+primeiros 10 s depois de carregar. A janela de Configurações fica translúcida
+nas skins de vidro (de propósito, mas o que está atrás aparece).
+
+**Catálogo** (`catalogo/plugins.json` + `gerar-catalogo.mjs`). Aba Descubra
+ligada nos profiles com o índice do GitHub (raw da `main`). O índice aponta para
+um commit; o script valida com o validador do próprio dsh. O catálogo instala
+**cada pasta de plugin sozinha**, sem `_comum`: por isso cada plugin leva uma
+cópia do `comum.js` (`node plugins/_comum/sincronizar.mjs`). Para testar sem
+mexer na instalação do usuário: `DSH_HOME` apontando para `.dsh` e outra porta
+(3081).
+
+**Ponte de voz** (Central de Voz, `harness.py`). "Central, harness: ..." roda
+`dsh --profile headless "<pedido>"` na pasta do DSHARNESS e fala a resposta;
+imagens geradas abrem na tela. Como é headless, a trava nega o arriscado
+sozinha: a Central nunca aprova nada. Testado sem áudio; falta testar falando.
+
+**Achado ao gravar o vídeo (04/11):** "Como eu uso o Transcritor?" e "Como eu
+uso a Central de Voz?" fizeram o 4B **responder de cabeça, sem chamar
+`meus_programas`** (o "Transcritor" ainda se confunde com a ferramenta
+`transcrever`). Com "Lê o LEIA-ME da Central de Voz e me diz em 3 passos" ele
+chamou a ferramenta e acertou. Candidato a ajuste: reforçar na descrição da
+ferramenta e no AGENTS.md que "como uso o X" é `meus_programas` `como_usar`.
+
+**Vídeo de apresentação:** `Videos/harness-apresentacao` (HyperFrames; o
+`gerar_index.py` monta a composição a partir dos tempos de cada palavra da voz).
+Publicado como release `apresentacao-2026-11-04`.
 
 ---
 

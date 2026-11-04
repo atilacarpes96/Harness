@@ -1,6 +1,8 @@
 # DSHARNESS
 
-Ambiente para usar o **dsh** (o agente de IA da DeepSeek) com modelos que rodam no seu PC, pelo Ollama. O destaque é a **ferramenta de tela**: ela deixa a IA ver o que está na tela e agir nela (clicar, digitar, trocar de janela), lendo os botões e textos que o próprio Windows informa, em vez de olhar fotos da tela.
+Ambiente para usar o **dsh** (o agente de IA da DeepSeek) com modelos que rodam no seu PC, pelo Ollama. Num chat só, ele usa os seus outros programas (imagem, transcrição, documentos, atalhos) e a **ferramenta de tela**: ela deixa a IA ver o que está na tela e agir nela (clicar, digitar, trocar de janela), lendo os botões e textos que o próprio Windows informa, em vez de olhar fotos da tela.
+
+▶ [Vídeo de apresentação (1min15)](https://github.com/atilacarpes96/Harness/releases/download/apresentacao-2026-11-04/harness-apresentacao.mp4)
 
 ## Como abrir
 
@@ -27,6 +29,7 @@ Desde 03/11/2026 o DSHARNESS usa os outros programas desta pasta:
 | Ferramenta | Usa | O que faz |
 |---|---|---|
 | **gerar_imagem** | Gerador de Imagens | Gera a imagem no ComfyUI e mostra no chat. Liga o ComfyUI se precisar. |
+| **comfyui** | Gerador de Imagens | Diz se o ComfyUI está ligado e quanta memória usa; desliga quando você pedir. |
 | **transcrever** | Transcritor | Transcreve link do YouTube, TikTok, Instagram ou arquivo do PC. O `.txt` fica ao lado do áudio. |
 | **ler_documento** | anydoc (Pacote IA Trabalho) | Lê PDF, Word, Excel, PowerPoint, ODT, RTF, EPUB e CSV, sem nada sair do PC. |
 | **meus_programas** | pasta dos programas e atalhos | Lista, abre pelo nome, abre a pasta ou explica pelo LEIA-ME. |
@@ -34,8 +37,41 @@ Desde 03/11/2026 o DSHARNESS usa os outros programas desta pasta:
 - A imagem pedida passa antes pelo **Melhorar prompt** do Gerador (uns 5 s a mais). Ele evita confusão como "farol" virar poste de luz. Para texto exato escrito na imagem, peça "sem melhorar".
 - Gerar imagem e transcrever usam a placa de vídeo. Por isso o modelo do agente sai da placa durante o trabalho e volta depois, sozinho. A resposta final demora uns segundos a mais.
 - A primeira imagem demora 1 a 3 min, porque liga o ComfyUI. As seguintes levam uns 40 s.
-- O ComfyUI continua ligado depois. Para desligar, use o Gerador de Imagens (pílula verde → Desligar o ComfyUI).
+- O ComfyUI continua ligado depois. Para desligar, veja o botão **ComfyUI** logo abaixo, ou peça "desliga o ComfyUI".
 - Programa novo nesta pasta (com LEIA-ME.md) ou atalho novo na área de trabalho aparece sozinho no **meus_programas**.
+- Para explicar um programa, peça com o verbo: "**lê o LEIA-ME** da Central de Voz e me diz como usar". Só "como uso a Central de Voz?" às vezes faz o modelo de 4B responder de cabeça (e errar), sem abrir o LEIA-ME.
+
+### Botão ComfyUI (barra lateral)
+
+- O item **ComfyUI** na barra lateral abre um painel: mostra se ele está ligado e quanta memória usa.
+- **Desligar o ComfyUI** libera a memória. A próxima imagem demora cerca de 1 minuto a mais, porque ele liga de novo.
+- **Desligar sozinho depois de cada imagem**: libera a máquina logo depois de gerar. Em troca, cada imagem leva cerca de 1 minuto a mais.
+
+### Acesso total com confirmação
+
+É o modo de acesso padrão (aparece embaixo da caixa de mensagem). O agente mexe em qualquer pasta, mas **para e pergunta** antes de:
+- apagar arquivos, formatar ou mexer em disco, desligar ou reiniciar o PC;
+- encerrar programas, mudar registro, permissões, firewall ou tarefas agendadas, rodar como administrador;
+- instalar ou desinstalar programas, dar `git push` (e afins), mandar dados para fora do PC;
+- mover ou renomear arquivos, ou editar arquivo fora da pasta do DSHARNESS.
+
+O pedido aparece na conversa como **Aguardando aprovação**, com o comando e o motivo:
+- **Rejeitar**: a ação não acontece e o agente é avisado.
+- **Permitir uma vez**: vale só para aquele comando.
+
+Sem interface (`--profile headless` ou pela Central de Voz), o que é arriscado é negado sozinho.
+
+### Skins
+
+Em **Configurações > Geral > Skin do Harness** (menu da conta, ou Ctrl+Alt+,): **Vidro**, **Aurora**, **Pôr do sol**, **Grafite** e **Papel**. "Original" volta ao visual de fábrica. A escolha fica salva neste navegador. Trocar a Aparência (Claro, Escuro ou Sistema) tira a skin.
+
+### Catálogo de plugins (aba Descubra)
+
+Em **Plug-ins > Descubra** aparecem os plugins do DSHARNESS, lidos do GitHub (`catalogo/plugins.json`). Cada um mostra o que faz, se é 100% local e se usa a placa de vídeo. Para instalar, abra o cartão do plugin e instale por ali; os que você já tem aparecem como **Instalado**.
+
+### Pela voz (Central de Voz)
+
+Diga "**Central, harness:** gera uma imagem de um gato" (ou "pede pro harness ..."). A Central manda o pedido para este agente local, sem tela e sem gastar a cota do Claude, e fala a resposta. A imagem abre na tela quando fica pronta. O que for arriscado é negado sozinho.
 
 ### Modo Enxuto
 
@@ -100,7 +136,8 @@ Todos os passos estão no fim de `screen-tool\README.txt`.
 | Pasta / arquivo | O que é |
 |---|---|
 | `screen-tool\` | A ferramenta de tela (`inspect.ps1` vê, `act.ps1` age, `texto.ps1` lê páginas, `tela.mjs` para o Claude) |
-| `plugins\` | Os plugins dos outros programas (imagem, transcrição, documentos, programas). Diagrama no `README.md` |
+| `plugins\` | Os plugins: imagem (com o botão ComfyUI), transcrição, documentos, programas, a trava `confirmar-perigoso` e as `skins`. Diagrama no `README.md` |
+| `catalogo\` | O índice da aba Descubra (`plugins.json`) e o script que o gera |
 | `.dsh\profiles\web` e `headless` | Configuração do dsh: plugins em `package.json`; modelo padrão e modo Enxuto em `cordis.patch.yml` |
 | `modelfiles\` | Os modelos com o contexto certo |
 | `harness-bench\results\` | Medições: comparação de modelos e custos |

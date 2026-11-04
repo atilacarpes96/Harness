@@ -3,6 +3,9 @@
 Ambiente de desenvolvimento de plugins e configuração para o **`dsh`**, o CLI de
 agente da DeepSeek, rodando contra modelos locais via **Ollama**.
 
+▶ **[Vídeo de apresentação](https://github.com/atilacarpes96/Harness/releases/download/apresentacao-2026-11-04/harness-apresentacao.mp4)**
+(1min15, telas reais da interface)
+
 O trabalho principal aqui é o **`screen-tool`**: dar a um modelo local de 4B
 consciência do que está na tela — e, agora, capacidade de agir sobre ela.
 
@@ -20,7 +23,8 @@ abrir qualquer programa ou atalho pelo nome. Ver
 | Pasta | O que é |
 |---|---|
 | `screen-tool/` | O plugin principal: percepção (`inspect.ps1`) e controle (`act.ps1`) de tela |
-| `plugins/` | Plugins que ligam o agente aos outros programas (gerador, transcritor, documentos, atalhos) |
+| `plugins/` | Plugins que ligam o agente aos outros programas (gerador, transcritor, documentos, atalhos), a trava `confirmar-perigoso` e as `skins` |
+| `catalogo/` | Índice da aba Descubra (`plugins.json`) e o gerador dele (`gerar-catalogo.mjs`) |
 | `dsh-safe-developer/` | Plugin com `validar_plugin_local`, para conferir outro plugin antes de confiar nele |
 | `harness-bench/` | Ferramentas de medição: compara modelos do Ollama e registra o payload real das chamadas |
 | `modelfiles/` | Modelfiles dos modelos derivados, com contexto corrigido |
@@ -99,6 +103,11 @@ flowchart LR
     A -->|ler_documento| D[anydoc<br/>PDF, Word, Excel...]
     A -->|meus_programas| P[pasta dos programas<br/>e atalhos da área de trabalho]
     A -->|analisar_tela / interagir_tela| S[screen-tool]
+    A -->|comfyui| C
+    B[Botão ComfyUI na barra lateral<br/>client.js + 127.0.0.1:48231] --> C
+    K{{confirmar-perigoso<br/>regras antes de cada ferramenta}} -.->|Aguardando aprovação| U
+    A -.- K
+    V["Central de Voz<br/>Central, harness: ..."] -->|dsh --profile headless| A
     N[Antes do trabalho pesado: tira o modelo do agente da placa.<br/>Depois: libera a placa no ComfyUI. O agente recarrega sozinho.]
     G -.- N
     T -.- N
@@ -111,6 +120,13 @@ flowchart LR
 | `plugins/transcritor/` | `transcrever`: link vai pelo `youtube.py`; arquivo do PC vai direto ao `worker.py`. Devolve até 9 mil caracteres do texto |
 | `plugins/documentos/` | `ler_documento`: converte com o anydoc (com cache em `%TEMP%\dsh-documentos`) e entrega em partes de 12 mil caracteres |
 | `plugins/meus-programas/` | `meus_programas`: lista os programas (pastas com `LEIA-ME.md`) e os atalhos, abre pelo nome, abre a pasta ou lê o LEIA-ME |
+| `plugins/gerador-imagens/` (`comfy.js`, `client.js`) | `comfyui`: estado e desligar; item **ComfyUI** na barra lateral com painel (memória, desligar, "desligar sozinho depois de cada imagem") |
+| `plugins/confirmar-perigoso/` | Modo **acesso total com confirmação**: regras fixas conferidas antes de cada ferramenta; na web vira "Aguardando aprovação" (Rejeitar / Permitir uma vez), no headless nega sozinho |
+| `plugins/skins/` (`client.js`) | Cinco skins (Vidro, Aurora, Pôr do sol, Grafite, Papel) em Configurações > Geral |
+| `catalogo/` | Aba **Descubra**: `plugins.json` (índice formato 1, validado com o validador do dsh) apontando para um commit deste repositório |
+
+O `plugins/_comum/comum.js` é a fonte única; `node plugins/_comum/sincronizar.mjs`
+copia para cada plugin, porque o catálogo instala cada pasta sozinha, sem `_comum`.
 
 Nada de caminho fixo no código: a pasta dos programas é a pasta acima do
 DSHARNESS. Variáveis para mudar: `DSH_PROGRAMAS`, `GERADOR_DIR`,
