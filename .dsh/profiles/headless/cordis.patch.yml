@@ -18,17 +18,13 @@
 # pelos bundles do package.json, não desta camada).
 
 # Orquestração multi-agente — nunca usada aqui, e cara (workflow sozinho = 4032 chars)
+# (workflow-worker-thread, tool-ralph, tool-subagent-list-agents e
+# tool-str-replace-editor sumiram no dsh 0.2.2: tirados daqui em 03/11/2026)
 - id: tool-workflow
-  disabled: true
-- id: workflow-worker-thread
-  disabled: true
-- id: tool-ralph
   disabled: true
 - id: tool-subagent
   disabled: true
 - id: tool-subagent-fork
-  disabled: true
-- id: tool-subagent-list-agents
   disabled: true
 - id: tool-subagent-control
   disabled: true
@@ -53,9 +49,6 @@
 - id: tool-jobs
   disabled: true
 
-# str_replace_editor (3148 chars) é redundante com read/write/edit do tool-fs
-- id: tool-str-replace-editor
-  disabled: true
 - id: agent-default-model
   name: "@deepseek-ai/dsh-agent-default-model"
   config:

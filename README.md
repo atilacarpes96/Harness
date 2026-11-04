@@ -6,6 +6,11 @@ agente da DeepSeek, rodando contra modelos locais via **Ollama**.
 O trabalho principal aqui é o **`screen-tool`**: dar a um modelo local de 4B
 consciência do que está na tela — e, agora, capacidade de agir sobre ela.
 
+Desde 03/11/2026 o agente também usa **os outros programas da pasta** por
+plugins (`plugins/`): gerar imagem, transcrever áudio e vídeo, ler documentos e
+abrir qualquer programa ou atalho pelo nome. Ver
+[Plugins dos outros programas](#plugins-dos-outros-programas).
+
 > **Leia o [STATUS.md](STATUS.md) antes de mexer.** Ele tem o estado atual, o
 > porquê de cada decisão e os achados que custaram medição. Várias conclusões
 > "óbvias" sobre este projeto estavam erradas, e o STATUS diz quais.
@@ -15,10 +20,11 @@ consciência do que está na tela — e, agora, capacidade de agir sobre ela.
 | Pasta | O que é |
 |---|---|
 | `screen-tool/` | O plugin principal: percepção (`inspect.ps1`) e controle (`act.ps1`) de tela |
+| `plugins/` | Plugins que ligam o agente aos outros programas (gerador, transcritor, documentos, atalhos) |
 | `dsh-safe-developer/` | Plugin com `validar_plugin_local`, para conferir outro plugin antes de confiar nele |
 | `harness-bench/` | Ferramentas de medição: compara modelos do Ollama e registra o payload real das chamadas |
 | `modelfiles/` | Modelfiles dos modelos derivados, com contexto corrigido |
-| `.dsh/` | Configuração do dsh: `settings.yaml`, profiles `web` e `headless`, preset `enxuto` |
+| `.dsh/` | Configuração do dsh: profiles `web` e `headless` (`package.json` lista os plugins; `cordis.patch.yml` tem modelo, modo Enxuto e cortes) |
 
 ## Começando
 
@@ -76,6 +82,45 @@ Observar é reversível; agir não é. Por isso:
    qualquer evento.
 3. **Scroll Lock** — com ele ligado, nenhuma injeção acontece. Veto de hardware,
    independente do agente se comportar.
+
+## Plugins dos outros programas
+
+Cada programa vira **uma ferramenta com poucos parâmetros**. O modelo só escolhe
+a ferramenta e preenche o pedido; o trabalho pesado fica no script que o próprio
+programa já tinha (o mesmo que as skills do Claude usam).
+
+```mermaid
+flowchart LR
+    U[Você no chat] --> A[Agente local<br/>dsh + Ollama]
+    A -->|gerar_imagem| G[gerar.py<br/>Gerador de Imagens]
+    G --> C[ComfyUI<br/>placa de vídeo]
+    A -->|transcrever| T[youtube.py / worker.py<br/>Transcritor]
+    T --> W[Whisper<br/>placa de vídeo]
+    A -->|ler_documento| D[anydoc<br/>PDF, Word, Excel...]
+    A -->|meus_programas| P[pasta dos programas<br/>e atalhos da área de trabalho]
+    A -->|analisar_tela / interagir_tela| S[screen-tool]
+    N[Antes do trabalho pesado: tira o modelo do agente da placa.<br/>Depois: libera a placa no ComfyUI. O agente recarrega sozinho.]
+    G -.- N
+    T -.- N
+```
+
+| Arquivo | O que faz |
+|---|---|
+| `plugins/_comum/comum.js` | Acha a pasta dos programas, roda processo com cancelamento (mata a árvore), libera a placa (Ollama e ComfyUI) e acha o Python certo |
+| `plugins/gerador-imagens/` | `gerar_imagem`: chama o `gerar.py` com "Melhorar prompt" ligado e devolve `![imagem](caminho)`, que aparece no chat |
+| `plugins/transcritor/` | `transcrever`: link vai pelo `youtube.py`; arquivo do PC vai direto ao `worker.py`. Devolve até 9 mil caracteres do texto |
+| `plugins/documentos/` | `ler_documento`: converte com o anydoc (com cache em `%TEMP%\dsh-documentos`) e entrega em partes de 12 mil caracteres |
+| `plugins/meus-programas/` | `meus_programas`: lista os programas (pastas com `LEIA-ME.md`) e os atalhos, abre pelo nome, abre a pasta ou lê o LEIA-ME |
+
+Nada de caminho fixo no código: a pasta dos programas é a pasta acima do
+DSHARNESS. Variáveis para mudar: `DSH_PROGRAMAS`, `GERADOR_DIR`,
+`TRANSCRITOR_DIR`, `DSH_PYTHON`, `ANYDOC_JS`.
+
+**Plugin novo:** criar `plugins/<nome>/` com `package.json` (campo
+`dsh.bundle.patch`), `cordis.patch.yml` (o `insert`) e `index.js` (`apply(ctx)`
+com `ctx.tools.register`); depois pôr o nome em `bundles` e em `dependencies`
+(`link:../../../plugins/<nome>`) nos dois profiles e rodar
+`dsh plugin --profile web install` e `dsh plugin --profile headless install`.
 
 ## Rodando
 

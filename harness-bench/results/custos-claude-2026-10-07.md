@@ -26,7 +26,7 @@ relido a cada passo seguinte, então o custo real cresce com o tamanho da tarefa
 |---|---|---|---|---|
 | Calculadora 128×37, conferir | ~1.100 tok, certo | **~340** (≈70 com ids conhecidos), certo | ~3.200 a 14.000 (2 a 9 prints) | não terminou (laço 1m40s) |
 | Bloco de Notas: digitar e salvar | ~700 tok, **texto embaralhado** | **~25**, certo; texto longo colado ~25 | ~1.600 a 3.200 | — |
-| Site CBMRS → Resoluções Técnicas, ler a lista | ~4.300 tok, lista incompleta (OCR corta em 120 linhas) | **~640**, lista exata | **~5.800** medido (read_page 1.900 + print 1.590 + get_page_text 2.300) | — |
+| Site de órgão público → lista de normas, ler a lista | ~4.300 tok, lista incompleta (OCR corta em 120 linhas) | **~640**, lista exata | **~5.800** medido (read_page 1.900 + print 1.590 + get_page_text 2.300) | — |
 | Wikipédia: buscar e ler | ~3.800 tok | **~370** | ~4.800 (estimado com as medidas acima) | — |
 | Configurações: resolução da tela | ~1.000 a 2.000 tok | **~65** | ~1.600 a 3.200 | — |
 

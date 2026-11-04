@@ -8,9 +8,21 @@ importers:
 
   .:
     dependencies:
+      dsh-documentos:
+        specifier: link:../../../plugins/documentos
+        version: link:../../../plugins/documentos
+      dsh-gerador-imagens:
+        specifier: link:../../../plugins/gerador-imagens
+        version: link:../../../plugins/gerador-imagens
+      dsh-meus-programas:
+        specifier: link:../../../plugins/meus-programas
+        version: link:../../../plugins/meus-programas
       dsh-safe-developer:
         specifier: link:../../../dsh-safe-developer
         version: link:../../../dsh-safe-developer
       dsh-screen-analyzer:
         specifier: link:../../../screen-tool
         version: link:../../../screen-tool
+      dsh-transcritor:
+        specifier: link:../../../plugins/transcritor
+        version: link:../../../plugins/transcritor

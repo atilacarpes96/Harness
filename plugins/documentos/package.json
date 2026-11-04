@@ -1,0 +1,16 @@
+{
+  "name": "dsh-documentos",
+  "version": "0.1.0",
+  "description": "Ferramenta ler_documento: PDF/Word/Excel/PowerPoint em texto pelo anydoc",
+  "type": "module",
+  "main": "index.js",
+  "files": [
+    "index.js",
+    "cordis.patch.yml"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  }
+}

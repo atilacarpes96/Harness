@@ -1,0 +1,16 @@
+{
+  "name": "dsh-gerador-imagens",
+  "version": "0.1.0",
+  "description": "Ferramenta gerar_imagem: usa o Gerador de Imagens (ComfyUI local)",
+  "type": "module",
+  "main": "index.js",
+  "files": [
+    "index.js",
+    "cordis.patch.yml"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  }
+}

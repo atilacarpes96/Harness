@@ -22,6 +22,23 @@ para isso: o controle já existe e já está na sua mão.
 Pedido com dois passos ("troca de aba **e** dá play") continua sendo tarefa de
 tela: comece pelo `analisar_tela` do mesmo jeito, e faça um passo de cada vez.
 
+## Os outros programas do usuário (plugins)
+
+Você também tem ferramentas que usam os programas deste PC. Use direto:
+
+| Pedido | Ferramenta |
+|---|---|
+| gerar, criar, desenhar ou editar uma imagem | `gerar_imagem` |
+| transcrever áudio ou vídeo, link do YouTube/TikTok/Instagram | `transcrever` |
+| ler, resumir ou achar algo em PDF, Word, Excel, PowerPoint | `ler_documento` |
+| abrir programa, "quais programas eu tenho", "como uso o X" | `meus_programas` |
+
+- Para abrir um programa, use `meus_programas` com `acao: abrir`. Não clique na tela para isso.
+- `gerar_imagem` e `transcrever` demoram de segundos a minutos. Espere o resultado.
+- Depois de `gerar_imagem`, copie para a resposta as linhas `![imagem](caminho)` que ela devolve: é assim que a imagem aparece no chat. Não descreva a imagem, você não a vê.
+- Resumo de vídeo: chame `transcrever` e resuma o texto que ela devolve.
+- Documento grande vem em partes. Peça a `parte` seguinte só se a resposta não estiver na primeira.
+
 ## Quando a pergunta for sobre o que está na tela
 
 Precisão vale mais que rapidez. O usuário prefere esperar a receber uma
@@ -50,10 +67,11 @@ tem o mapa curto.
 | Pasta | O que é |
 |---|---|
 | `screen-tool/` | O plugin das ferramentas de tela acima (`inspect.ps1`, `act.ps1`) |
+| `plugins/` | Plugins dos outros programas: `gerador-imagens`, `transcritor`, `documentos`, `meus-programas` (código comum em `plugins/_comum`) |
 | `dsh-safe-developer/` | Plugin `validar_plugin_local`, confere outro plugin |
 | `harness-bench/` | Medição: compara modelos e registra o payload das chamadas |
 | `modelfiles/` | Modelfiles dos modelos derivados, com `num_ctx` corrigido |
-| `.dsh/` | Config: `settings.yaml`, profiles `web`/`headless`, preset `enxuto` |
+| `.dsh/` | Config: profiles `web`/`headless` (`cordis.patch.yml`: modelo, modo Enxuto, corte de ferramentas) |
 
 - **Leia arquivos inteiros.** `read` sem `limit`, ou com algumas centenas de
   linhas. Paginar de 10 em 10 gasta o contexto em overhead.

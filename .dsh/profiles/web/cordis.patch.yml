@@ -68,3 +68,98 @@
     apiKeyEnv: OLLAMA_LAUNCH_DSH_API_KEY
     baseURL: http://127.0.0.1:11434/v1
     model: dsh-4b:32k
+- id: ui-settings-general
+  name: "@deepseek-ai/dsh-client-ui-settings-general"
+  config:
+    welcomeNoticeVersion: 2026-09-28.1
+
+# Modo "Enxuto", recriado em 03/11/2026 para o dsh 0.2.2.
+#
+# O preset antigo (.dsh/.agent-presets/enxuto) deixou de ser lido na migracao
+# para o dsh 0.2 (07/10/2026): a web voltou ao "Modo padrao", que manda 40
+# ferramentas e ~13 mil tokens de prompt por chamada (medido pelo proxy-log).
+# No 0.2 um modo e uma entrada @deepseek-ai/dsh-agent-preset no perfil.
+#
+# Base: o preset "standard" do 0.2.2 sem tool-jobs, tool-schedule, skills,
+# goal, planning, subagent_fork/workflow, tool-web e plugin_manager. Ficam
+# shell, arquivos, perguntar ao usuario, present (mostrar arquivo), todo,
+# subagent (o caso "le a pasta inteira" de 05/09) e a compactacao. As
+# ferramentas dos plugins locais vem dos bundles e chegam em qualquer modo.
+- insert:
+    - id: preset-enxuto
+      name: "@deepseek-ai/dsh-agent-preset"
+      config:
+        id: enxuto
+        name: Enxuto
+        description: >-
+          Shell, arquivos e os plugins locais (tela, programas, imagem,
+          transcrição, documentos), com menos ferramentas para o modelo local
+          acertar mais e responder mais rápido.
+        order: 0
+        plugins:
+          - id: persona
+            name: "@deepseek-ai/dsh-persona"
+            config:
+              prefix: You are a coding agent powered by the {{model}} model.
+          - id: agent-instructions
+            name: "@deepseek-ai/dsh-agent-instructions"
+            config:
+              maxBytes: 65536
+          - id: time-context
+            name: "@deepseek-ai/dsh-time-context"
+          - id: tool-pwsh
+            name: "@deepseek-ai/dsh-tool-pwsh"
+          - id: tool-fs
+            name: "@deepseek-ai/dsh-tool-fs"
+            config:
+              applyPatch: false
+          - id: tool-fs-search
+            name: "@deepseek-ai/dsh-tool-fs-search"
+            config:
+              sampleOverCapGlobResults: false
+          - id: compaction
+            name: cordis:group
+            group: true
+            isolate:
+              compaction: true
+              toolResultPruner: true
+            config:
+              - id: compaction-basic
+                name: "@deepseek-ai/dsh-compaction-basic"
+              - id: command-compact
+                name: "@deepseek-ai/dsh-command-compact"
+              # Maior que o padrao (8192/4096/1024): transcricao e documento
+              # voltam com ate ~12 mil caracteres de proposito.
+              - id: tool-result-pruner
+                name: "@deepseek-ai/dsh-compaction-tool-result-pruner"
+                config:
+                  thresholdChars: 12288
+                  headChars: 8192
+                  tailChars: 2048
+          - id: delegation
+            name: cordis:group
+            group: true
+            isolate:
+              workflowEngine: true
+            config:
+              - id: tool-subagent-control
+                name: "@deepseek-ai/dsh-tool-subagent-control"
+              - id: tool-subagent
+                name: "@deepseek-ai/dsh-tool-subagent"
+                config:
+                  provider: spawn
+                  toolName: subagent
+                  modelSelection: true
+                  modelDiscovery: true
+          - id: tool-ask-user
+            name: "@deepseek-ai/dsh-tool-ask-user"
+          - id: tool-todo
+            name: "@deepseek-ai/dsh-tool-todo"
+            config:
+              allowParallelInProgress: true
+          - id: present
+            name: "@deepseek-ai/dsh-tool-present"
+- id: agent-preset-registry
+  name: "@deepseek-ai/dsh-agent-preset-registry"
+  config:
+    default: enxuto

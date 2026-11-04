@@ -2,8 +2,12 @@
   "name": "dsh-profile-headless",
   "private": true,
   "dependencies": {
+    "dsh-documentos": "link:../../../plugins/documentos",
+    "dsh-gerador-imagens": "link:../../../plugins/gerador-imagens",
+    "dsh-meus-programas": "link:../../../plugins/meus-programas",
     "dsh-safe-developer": "link:../../../dsh-safe-developer",
-    "dsh-screen-analyzer": "link:../../../screen-tool"
+    "dsh-screen-analyzer": "link:../../../screen-tool",
+    "dsh-transcritor": "link:../../../plugins/transcritor"
   },
   "dsh": {
     "profile": {
@@ -11,7 +15,11 @@
         "@deepseek-ai/dsh-base",
         "@deepseek-ai/dsh-headless",
         "dsh-safe-developer",
-        "dsh-screen-analyzer"
+        "dsh-screen-analyzer",
+        "dsh-meus-programas",
+        "dsh-gerador-imagens",
+        "dsh-transcritor",
+        "dsh-documentos"
       ]
     }
   }

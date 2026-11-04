@@ -1,10 +1,83 @@
-# DSHARNESS — Status (última atualização: 31/08/2026, 2ª sessão)
+# DSHARNESS — Status (última atualização: 03/11/2026)
+
+## 03/11/2026 — dsh 0.2.2-alpha.3 e plugins dos outros programas
+
+**Versão:** `npm install -g @deepseek-ai/dsh@0.2.2-alpha.3` (saiu no mesmo dia;
+a tag `latest` do npm era a 0.2.1-rc.5). Escolhida por trazer a interface em
+pt-BR (só existe na linha 0.2.2) e o gerenciador de plugins novo. Antes: 0.2.0-rc.2.
+
+**O npm 11 não roda scripts de instalação** (política `allow-scripts`: pulou 5
+pacotes). Conferido um por um, nenhum faz falta no Windows: o `node-pty` já traz
+`conpty.dll` e `OpenConsole.exe` em `prebuilds\win32-x64\conpty`, e o
+`conpty.node` carrega a DLL da própria pasta (`conpty.cc`: `PathCombineW(currentDir,
+"conpty\\conpty.dll")`); o `koffi` 3.x pega o binário por dependência opcional
+(`@koromix/koffi-win32-x64`, carrega); o `ensure-spawn-helper` só faz `chmod`; o
+do `protobufjs` só avisa versão e o do `@google/genai` é vazio. (O
+`post-install.js` do `node-pty` foi rodado à mão antes de achar isso; inofensivo.)
+
+**Profiles na versão nova:**
+- O headless avisava `entry not found` para 4 cortes que sumiram no 0.2.2
+  (`workflow-worker-thread`, `tool-ralph`, `tool-subagent-list-agents`,
+  `tool-str-replace-editor`). Tirados do `cordis.patch.yml`.
+- **O preset `.dsh/.agent-presets/enxuto` não é lido desde a migração para o
+  0.2 (07/10/2026).** A web voltou ao "Modo padrão": medido pelo proxy-log,
+  **40 ferramentas e 13,2 mil tokens** de prompt por chamada. No 0.2 um modo é
+  uma entrada `@deepseek-ai/dsh-agent-preset` (`id`, `name`, `description`,
+  `order`, `plugins`) e o padrão fica em `agent-preset-registry.config.default`.
+  Recriado no `web/cordis.patch.yml` a partir do `standard` do 0.2.2: **24
+  ferramentas, 7,6 mil tokens**; a mesma pergunta caiu de 7 s para 3 s. A
+  interface lembra o último modo usado no rascunho da sessão nova, então quem
+  já usou "Modo padrão" precisa escolher Enxuto uma vez.
+- O `tool-result-pruner` só corta resultado grande sob pressão de contexto
+  (`compactIfNeeded`), não a cada chamada. No Enxuto ele foi para
+  12288/8192/2048 porque transcrição e documento voltam com até ~12 mil caracteres.
+
+**Plugins dos outros programas** (`plugins/`, ligados por `link:` nos dois
+profiles): `gerar_imagem`, `transcrever`, `ler_documento`, `meus_programas`.
+Regra seguida: o modelo só escolhe a ferramenta e preenche 1–3 campos; quem faz
+o trabalho é o script que o programa já tinha (o mesmo das skills do Claude),
+com JSON na última linha. Antes de ComfyUI/Whisper o plugin tira os modelos do
+Ollama da placa (inclusive o do agente, que recarrega em 5–15 s na resposta
+seguinte); depois do ComfyUI, `POST /free`. O `exec.signal` mata a árvore do
+processo se a resposta for parada.
+
+Medido (headless e web, `dsh-4b:32k`):
+- headless: **16 ferramentas, ~6,1 mil tokens** de prompt;
+- `meus_programas` listar: 0,2 s; o agente escolheu a ferramenta sozinho;
+- `ler_documento` (PDF): 0,2 s, e a segunda leitura sai do cache;
+- `transcrever` (áudio de 50 s): 15–20 s de Whisper, 28 s no total com o resumo;
+- `gerar_imagem` (Qwen): ~40 s por imagem; +1 a 3 min se o ComfyUI estava desligado.
+
+Achados:
+- **"farol numa praia" direto no Qwen virou um poste de luz.** Com o Melhorar
+  prompt do Gerador (LLM local, ~5 s) virou farol. Ficou ligado por padrão.
+- A interface converte `![alt](E:\caminho\img.png)` em `/api/file?path=...` e
+  mostra a imagem no chat. O plugin devolve essas linhas prontas e diz ao modelo
+  para não descrever a imagem: sem isso o 4B inventava a descrição. A
+  ferramenta `present` existe, mas o 4B não a usou.
+- Teste com `Start-Process -Wait` em volta do dsh **trava**: ele espera a árvore
+  inteira, e o ComfyUI que o `gerar.py` sobe fica vivo de propósito. A imagem
+  tinha saído em 40 s. Para testar, ler o log em vez de esperar o processo.
+- O título automático das sessões sai em inglês ("Sunset Beach Lamp Image").
+- **PENDENTE: o terminal do agente (`pwsh`) falha em toda chamada** com
+  `SetNamedSecurityInfoW failed (Win32 5): grantWrite(...DSHARNESS)`. No modo de
+  acesso `workspace-write` o dsh isola o shell (token restrito + SID de
+  capacidade `S-1-4-…`) e, a cada concessão, grava o DACL **e** um rótulo de
+  integridade Low na pasta (flags 4|16). Gravar rótulo exige `WRITE_OWNER`; no
+  disco E: o usuário herda só "Modificar" (é dono, então tem `WRITE_DAC`, mas
+  não `WRITE_OWNER`). O código do rótulo já existia no 0.2.0-rc.2: não é
+  regressão da atualização. O 4B entra em laço repetindo a chamada. Saídas:
+  dar controle total da pasta ao usuário (`icacls` com `(OI)(CI)F`, sem admin,
+  mantém o isolamento) ou o modo `danger-full-access` (sem isolamento). As
+  ferramentas de tela e os plugins não passam pelo pwsh e funcionam.
+
+---
 
 ## O que é este projeto, de verdade
 
 `E:\Programas desenvolvidos\DSHARNESS` é o ambiente de desenvolvimento de plugins/config pro **`dsh`**, o CLI de agente de IA da DeepSeek (parecido com o Claude Code), rodando contra modelos locais via Ollama.
 
-Existe um documento de handoff antigo descrevendo uma ferramenta de análise de PPCI (segurança contra incêndio) com RAG, análise de plantas, etc. **Isso é só a visão futura — nada disso está construído ainda.** Hoje o repositório só tem a infraestrutura de harness (testar/comparar modelos locais) e dois plugins pequenos. Se uma sessão futura ler aquele handoff, tratar como contexto de intenção, não como estado atual.
+Existe um documento de handoff antigo descrevendo uma ferramenta de análise de documentos técnicos com RAG, análise de plantas, etc. **Isso é só a visão futura — nada disso está construído ainda.** Hoje o repositório só tem a infraestrutura de harness (testar/comparar modelos locais) e dois plugins pequenos. Se uma sessão futura ler aquele handoff, tratar como contexto de intenção, não como estado atual.
 
 ## Estrutura
 
@@ -129,13 +202,13 @@ calculado em JavaScript — **3/3** —, e depois com o modelo local fazendo o c
 sozinho (calcular 6×9 e conferir o próprio resultado), com o valor confirmado
 por leitura independente.
 
-**Primeiro alvo fora do laboratório (31/08): o site do CBMRS pelo Chrome.** A
+**Primeiro alvo fora do laboratório (31/08): o site de um órgão público pelo Chrome.** A
 ferramenta fez tudo — focar, achar a barra de endereço pela árvore de
-acessibilidade, digitar, Enter, esperar e conferir. Chegou em
-`bombeiros.rs.gov.br/inicial`, com 58 linhas lidas da página.
+acessibilidade, digitar, Enter, esperar e conferir. Chegou na página inicial
+do site, com 58 linhas lidas da página.
 
 Mas falhou na primeira tentativa, e o modo de falha valeu mais que o sucesso: o
-título ficou `chrome://blankhttps//www.bombeiros.rs.gov.br/`. Clicar num campo
+título ficou `chrome://blankhttps//www.<site>/`. Clicar num campo
 **posiciona o cursor mas não seleciona**, então o endereço foi concatenado ao
 `about:blank` que já estava lá, e o Chrome tentou interpretar o resultado — foi
 daí que sumiu o `:` do `https://`, e não de erro na digitação (verificado à
