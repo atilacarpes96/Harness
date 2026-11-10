@@ -38,7 +38,7 @@ $ESTADO_DIR = Join-Path $env:LOCALAPPDATA 'dsharness'
 $ESTADO = Join-Path $ESTADO_DIR 'instancia.json'
 # O Ollama deste usuario guarda os modelos fora do padrao. Sem isto, um serve
 # iniciado por aqui acha que nao existe modelo nenhum.
-$MODELOS = 'E:\Ollama'
+$PASTA_MODELOS = 'E:\Ollama'
 
 function Passo($n, $texto) { Write-Host ("[{0}/4] {1}" -f $n, $texto) -ForegroundColor Cyan }
 function Ok($texto)   { Write-Host ("      OK  " + $texto) -ForegroundColor Green }
@@ -79,7 +79,9 @@ function Erro($texto) {
 function OllamaVivo {
   try {
     $r = Invoke-RestMethod -Uri "$OLLAMA/api/tags" -TimeoutSec 3 -ErrorAction Stop
-    return @($r.models)
+    # A virgula impede o PowerShell de desembrulhar a lista vazia em $null:
+    # sem ela, "respondeu com 0 modelos" e "nao respondeu" ficavam iguais.
+    return ,@($r.models)
   } catch { return $null }
 }
 
@@ -130,30 +132,45 @@ if ($antigas) {
 # -- 1. Ollama ---------------------------------------------------------------
 Passo 1 'Verificando o Ollama'
 $modelos = OllamaVivo
-if ($modelos) {
+if ($modelos.Count) {
   Ok ("ja estava rodando, {0} modelos" -f $modelos.Count)
 } else {
   # Ollama que existe mas nao responde e um serve travado na subida (visto em
   # 04/10/2026: o processo ficou vivo sem nunca abrir a porta). Subir outro por
   # cima nao resolve; encerrar o travado resolve.
-  $travados = @(Get-Process -Name 'ollama' -ErrorAction SilentlyContinue)
+  # Ollama que responde com 0 modelos subiu olhando a pasta padrao do C:, que
+  # esta vazia (09/11/2026: serve com OLLAMA_MODELS=C:\...\.ollama\models). O
+  # remedio e o mesmo: encerrar, inclusive o "ollama app" da bandeja, que
+  # senao sobe outro serve com a pasta errada, e subir com $PASTA_MODELOS.
+  $pastaErrada = ($null -ne $modelos)
+  $travados = @(Get-Process -Name 'ollama', 'ollama app' -ErrorAction SilentlyContinue)
   if ($travados) {
-    Aviso ("Ollama travado (pid {0}); encerrando" -f (($travados.Id) -join ', '))
+    if ($pastaErrada) {
+      Aviso ("Ollama sem nenhum modelo, olhando a pasta errada (pid {0}); reiniciando com {1}" -f (($travados.Id) -join ', '), $PASTA_MODELOS)
+    } else {
+      Aviso ("Ollama travado (pid {0}); encerrando" -f (($travados.Id) -join ', '))
+    }
     $travados | Stop-Process -Force -ErrorAction SilentlyContinue
-    Start-Sleep -Milliseconds 800
+    $fim = (Get-Date).AddSeconds(5)
+    while ((Get-Process -Name 'ollama' -ErrorAction SilentlyContinue) -and (Get-Date) -lt $fim) {
+      Start-Sleep -Milliseconds 300
+    }
   } else {
     Aviso 'nao respondeu; subindo'
   }
-  $env:OLLAMA_MODELS = $MODELOS
+  $env:OLLAMA_MODELS = $PASTA_MODELOS
   $log = Join-Path $env:TEMP 'dsharness-ollama.log'
   Start-Process -FilePath 'ollama' -ArgumentList 'serve' -WindowStyle Hidden `
     -RedirectStandardError $log -ErrorAction SilentlyContinue
   $limite = (Get-Date).AddSeconds(45)
-  while (-not $modelos -and (Get-Date) -lt $limite) {
+  while (-not $modelos.Count -and (Get-Date) -lt $limite) {
     Start-Sleep -Milliseconds 800
     $modelos = OllamaVivo
   }
-  if (-not $modelos) {
+  if ($null -ne $modelos -and -not $modelos.Count) {
+    Erro ("o Ollama subiu, mas nao achou nenhum modelo em {0}.`n`nConfira se a pasta existe e tem as subpastas blobs e manifests." -f $PASTA_MODELOS)
+  }
+  if (-not $modelos.Count) {
     $fim = ''
     if (Test-Path $log) { $fim = (Get-Content $log -Tail 3) -join "`n" }
     Erro ("o Ollama nao subiu em 45s.`n`nUltimas linhas do log:`n" + $fim)
